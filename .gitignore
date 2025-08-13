@@ -22,3 +22,6 @@ yarn-error.log
 /.vscode
 /.zed
 Product-requirements-document.md
+.CLAUDE.md
+.claude
+.claude/
