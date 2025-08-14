@@ -149,6 +149,8 @@ Key environment variables to configure:
 
 ## Common Development Tasks
 
+First read the [instructions.md](.claude/instructions.md), contents development instructionbs.
+
 - Adding new language: Update `config/app.php` locales, create `resources/lang/{locale}` directory
 - Modifying FortiGate integration: Update `app/Services/FortiGateService.php`
 - Adding audit events: Use `AuditLog::create()` in relevant controllers/services
