@@ -19,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        \Illuminate\Support\Facades\Blade::component('layouts.admin', 'admin-layout');
+        \Illuminate\Support\Facades\Blade::component('layouts.guest', 'guest-layout');
     }
 }
