@@ -1,0 +1,78 @@
+<?php
+
+return [
+    'registration_title' => 'Guest Registration',
+    'registration_subtitle' => 'Temporary network access (24 hours)',
+    'personal_info' => 'Personal Information',
+    'sponsor_info' => 'Sponsor Information',
+    'first_name' => 'First Name',
+    'first_name_placeholder' => 'Enter your first name',
+    'last_name' => 'Last Name',
+    'last_name_placeholder' => 'Enter your last name',
+    'email' => 'Email Address',
+    'email_placeholder' => 'your.email@example.com',
+    'phone' => 'Phone',
+    'phone_optional' => 'Phone (optional)',
+    'phone_placeholder' => '+1 234 567 8900',
+    'company' => 'Company',
+    'company_optional' => 'Company (optional)',
+    'company_placeholder' => 'Your company name',
+    'sponsor_name' => 'Sponsor Name',
+    'sponsor_name_placeholder' => 'Employee who invited you',
+    'sponsor_email' => 'Sponsor Email',
+    'sponsor_email_placeholder' => 'sponsor@company.com',
+    'visit_reason' => 'Visit Reason',
+    'visit_reason_optional' => 'Visit Reason (optional)',
+    'visit_reason_placeholder' => 'Briefly describe the purpose of your visit',
+    'important_notice' => 'Important Notice',
+    'validation_notice' => 'You must validate your email within 30 minutes of registration.',
+    'register_button' => 'Register',
+    
+    // Success page
+    'registration_success_title' => 'Registration Successful!',
+    'registration_success_message' => 'A validation email has been sent to :email',
+    'validation_time_limit' => 'You have 30 minutes to validate your account.',
+    'next_steps_title' => 'Next Steps',
+    'step_check_email' => 'Check your inbox',
+    'step_click_link' => 'Click the validation link',
+    'step_accept_charter' => 'Accept the terms of use',
+    'step_connect' => 'Connect to the network',
+    'spam_notice' => 'Also check your spam folder if you cannot find the email.',
+    
+    // Validation success
+    'validation_success_title' => 'Email Successfully Validated!',
+    'validation_success_message' => 'Your guest account is now active.',
+    'account_details' => 'Account Details',
+    'valid_until' => 'Valid until',
+    'account_type' => 'Account type',
+    'charter_required' => 'Before accessing the network, you must accept our terms of use.',
+    'view_charter_button' => 'View Terms',
+    'connection_info' => 'Connection Information',
+    'connection_instructions' => 'Use your credentials received by email to connect to the WiFi network.',
+    
+    // Validation failed
+    'validation_failed_title' => 'Validation Failed',
+    'validation_expired_message' => 'The validation link has expired.',
+    'validation_expired_explanation' => 'Validation links are valid for 30 minutes. Your account has been deleted and you must register again.',
+    'validation_invalid_message' => 'The validation link is invalid.',
+    'validation_invalid_explanation' => 'This link may have already been used or is not valid.',
+    'validation_error_message' => 'An error occurred during validation.',
+    'validation_error_explanation' => 'A technical error occurred. Please try again or contact support.',
+    'register_again_button' => 'Register Again',
+    'contact_support' => 'If the problem persists, contact your network administrator.',
+    
+    // Success page additions
+    'account_credentials' => 'Your Account Credentials',
+    'username_label' => 'Username',
+    'password_label' => 'Password',
+    'save_credentials_notice' => 'Please save these credentials securely. You will need them to connect to the network.',
+    'open_captive_portal' => 'Open Captive Portal',
+    'register_another' => 'Register Another Guest',
+    
+    // Charter/Terms of Use
+    'charter_title' => 'WiFi Network Terms of Use',
+    'charter_notice' => 'By accepting these terms, you acknowledge that you have read and understood the terms of this charter.',
+    'accept_charter' => 'I Accept the Terms',
+    'decline_charter' => 'Cancel',
+    'processing' => 'Processing',
+];

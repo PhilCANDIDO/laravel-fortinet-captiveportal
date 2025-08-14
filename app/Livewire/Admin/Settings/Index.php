@@ -263,13 +263,7 @@ class Index extends Component
     
     private function getDefaultCharter($locale)
     {
-        $charters = [
-            'fr' => "Conditions d'utilisation du réseau WiFi\n\nEn accédant à ce réseau, vous acceptez de:\n- Respecter la législation en vigueur\n- Ne pas accéder à des contenus illégaux\n- Ne pas compromettre la sécurité du réseau\n- Utiliser le réseau de manière responsable\n\nTout abus sera sanctionné.",
-            'en' => "WiFi Network Terms of Use\n\nBy accessing this network, you agree to:\n- Comply with applicable laws\n- Not access illegal content\n- Not compromise network security\n- Use the network responsibly\n\nAny abuse will be sanctioned.",
-            'it' => "Termini di utilizzo della rete WiFi\n\nAccedendo a questa rete, accetti di:\n- Rispettare le leggi vigenti\n- Non accedere a contenuti illegali\n- Non compromettere la sicurezza della rete\n- Utilizzare la rete in modo responsabile\n\nOgni abuso sarà sanzionato.",
-            'es' => "Términos de uso de la red WiFi\n\nAl acceder a esta red, acepta:\n- Cumplir con las leyes aplicables\n- No acceder a contenido ilegal\n- No comprometer la seguridad de la red\n- Usar la red de manera responsable\n\nCualquier abuso será sancionado.",
-        ];
-        
-        return $charters[$locale] ?? $charters['fr'];
+        // Use the model's default charter which is already in Markdown format
+        return \App\Models\Setting::getDefaultCharter($locale);
     }
 }

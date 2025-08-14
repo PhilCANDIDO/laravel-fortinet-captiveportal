@@ -83,6 +83,8 @@ class Login extends Component
     
     public function render()
     {
-        return view('livewire.admin.auth.login')->layout('layouts.guest');
+        return view('livewire.admin.auth.login')
+            ->extends('layouts.guest')
+            ->section('content');
     }
 }

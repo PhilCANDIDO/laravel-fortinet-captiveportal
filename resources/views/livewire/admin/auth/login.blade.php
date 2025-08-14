@@ -1,5 +1,6 @@
-<div>
-    <h2 class="text-center text-2xl font-bold text-gray-900 mb-6">{{ __('auth.login_title') }}</h2>
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow">
+        <h2 class="text-center text-2xl font-bold text-gray-900">{{ __('auth.login_title') }}</h2>
     
     <form wire:submit.prevent="login">
         <!-- Session Status -->
@@ -81,4 +82,5 @@
             </button>
         </div>
     </form>
+    </div>
 </div>
