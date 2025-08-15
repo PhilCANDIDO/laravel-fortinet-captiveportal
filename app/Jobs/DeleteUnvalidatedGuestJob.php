@@ -33,19 +33,38 @@ class DeleteUnvalidatedGuestJob implements ShouldQueue
         $user = User::find($this->userId);
         
         if (!$user) {
-            Log::info('User not found for deletion', ['user_id' => $this->userId]);
+            Log::info('User not found for validation check', ['user_id' => $this->userId]);
             return;
         }
         
-        // Only delete if still unvalidated guest
+        // Only disable if still unvalidated guest
         if ($user->isGuest() && !$user->validated_at) {
-            Log::info('Deleting unvalidated guest', [
+            Log::info('Disabling unvalidated guest', [
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'created_at' => $user->created_at,
             ]);
             
-            $userService->deleteUser($user);
+            // Disable the user instead of deleting
+            $user->is_active = false;
+            $user->status = User::STATUS_SUSPENDED;
+            $user->status_reason = 'Email not validated within required time';
+            $user->save();
+            
+            // Disable in FortiGate
+            try {
+                $fortiGateService = app(\App\Services\FortiGateService::class);
+                if ($fortiGateService->isConfigured()) {
+                    $fortiGateService->updateUser($user->fortigate_username, [
+                        'status' => 'disable'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to disable user in FortiGate', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
     }
 }

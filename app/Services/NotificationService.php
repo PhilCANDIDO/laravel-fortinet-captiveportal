@@ -15,36 +15,78 @@ class NotificationService
      */
     public function sendGuestValidationEmail(User $user, string $password): void
     {
-        if (!$user->isGuest() || !$user->validation_token) {
-            Log::warning('Attempted to send validation email to non-guest or without token', [
+        if (!$user->isGuest()) {
+            Log::warning('Attempted to send guest email to non-guest', [
                 'user_id' => $user->id,
                 'user_type' => $user->user_type,
             ]);
             return;
         }
         
+        $validationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
+        $locale = $this->getUserLocale($user);
+        
+        // If validation is disabled, send credentials email without validation link
+        if (!$validationEnabled) {
+            $this->sendGuestCredentialsEmail($user, $password);
+            return;
+        }
+        
+        // Validation is enabled, check for token
+        if (!$user->validation_token) {
+            Log::warning('No validation token for guest user', [
+                'user_id' => $user->id,
+            ]);
+            return;
+        }
+        
         // Generate validation URL
+        $expirationMinutes = \App\Models\Setting::getGuestValidationDelayMinutes();
         $validationUrl = URL::temporarySignedRoute(
             'guest.validate',
-            Carbon::now()->addMinutes(30),
+            Carbon::now()->addMinutes($expirationMinutes),
             ['token' => $user->validation_token]
         );
         
-        // Set locale for email
-        $locale = $this->getUserLocale($user);
-        
-        // Send email
+        // Send validation email
         Mail::send("emails.guest-validation.{$locale}", [
             'user' => $user,
             'password' => $password,
+            'username' => $user->fortigate_username,
             'validationUrl' => $validationUrl,
-            'expiresIn' => 30, // minutes
+            'expiresIn' => $expirationMinutes,
         ], function ($message) use ($user, $locale) {
             $message->to($user->email, $user->name)
                     ->subject($this->getSubject('guest_validation', $locale));
         });
         
         Log::info('Guest validation email sent', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'locale' => $locale,
+        ]);
+    }
+    
+    /**
+     * Send guest credentials email (no validation required)
+     */
+    public function sendGuestCredentialsEmail(User $user, string $password): void
+    {
+        $locale = $this->getUserLocale($user);
+        $captivePortalUrl = \App\Models\FortiGateSettings::current()->captive_portal_url;
+        
+        // Send credentials email without validation link
+        Mail::send("emails.guest-credentials.{$locale}", [
+            'user' => $user,
+            'password' => $password,
+            'username' => $user->fortigate_username,
+            'captivePortalUrl' => $captivePortalUrl,
+        ], function ($message) use ($user, $locale) {
+            $message->to($user->email, $user->name)
+                    ->subject($this->getSubject('guest_credentials', $locale));
+        });
+        
+        Log::info('Guest credentials email sent', [
             'user_id' => $user->id,
             'email' => $user->email,
             'locale' => $locale,
@@ -271,6 +313,7 @@ class NotificationService
         $subjects = [
             'fr' => [
                 'guest_validation' => 'Validation de votre compte invité',
+                'guest_credentials' => 'Vos identifiants de connexion WiFi',
                 'welcome' => 'Bienvenue - Vos identifiants de connexion',
                 'expiration_reminder' => 'Votre accès expire dans :days jours',
                 'account_expired' => 'Votre compte a expiré',
@@ -282,6 +325,7 @@ class NotificationService
             ],
             'en' => [
                 'guest_validation' => 'Guest Account Validation',
+                'guest_credentials' => 'Your WiFi Login Credentials',
                 'welcome' => 'Welcome - Your Login Credentials',
                 'expiration_reminder' => 'Your access expires in :days days',
                 'account_expired' => 'Your account has expired',

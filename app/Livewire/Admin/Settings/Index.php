@@ -37,6 +37,8 @@ class Index extends Component
     // Guest settings
     public $guest_access_duration_hours = 24;
     public $guest_validation_timeout_minutes = 30;
+    public $guest_email_validation_enabled = true;
+    public $guest_validation_delay_minutes = 30;
     
     // Consultant settings
     public $consultant_max_duration_days = 365;
@@ -61,6 +63,8 @@ class Index extends Component
         'email_from_address' => 'required|email',
         'guest_access_duration_hours' => 'required|integer|min:1|max:168',
         'guest_validation_timeout_minutes' => 'required|integer|min:5|max:120',
+        'guest_email_validation_enabled' => 'boolean',
+        'guest_validation_delay_minutes' => 'required|integer|min:5|max:1440',
         'consultant_max_duration_days' => 'required|integer|min:1|max:730',
     ];
 
@@ -97,6 +101,8 @@ class Index extends Component
         
         $this->guest_access_duration_hours = Setting::get('guest_access_duration_hours', 24);
         $this->guest_validation_timeout_minutes = Setting::get('guest_validation_timeout_minutes', 30);
+        $this->guest_email_validation_enabled = (bool) Setting::get('guest_email_validation_enabled', true);
+        $this->guest_validation_delay_minutes = Setting::get('guest_validation_delay_minutes', 30);
         
         $this->consultant_max_duration_days = Setting::get('consultant_max_duration_days', 365);
     }
@@ -206,11 +212,15 @@ class Index extends Component
         $this->validate([
             'guest_access_duration_hours' => 'required|integer|min:1|max:168',
             'guest_validation_timeout_minutes' => 'required|integer|min:5|max:120',
+            'guest_email_validation_enabled' => 'boolean',
+            'guest_validation_delay_minutes' => 'required|integer|min:5|max:1440',
             'consultant_max_duration_days' => 'required|integer|min:1|max:730',
         ]);
         
         Setting::set('guest_access_duration_hours', $this->guest_access_duration_hours);
         Setting::set('guest_validation_timeout_minutes', $this->guest_validation_timeout_minutes);
+        Setting::set('guest_email_validation_enabled', $this->guest_email_validation_enabled ? '1' : '0');
+        Setting::set('guest_validation_delay_minutes', $this->guest_validation_delay_minutes);
         Setting::set('consultant_max_duration_days', $this->consultant_max_duration_days);
         
         AuditService::log('settings_updated', 'system', [
@@ -218,6 +228,8 @@ class Index extends Component
             'changes' => [
                 'guest_access_duration_hours' => $this->guest_access_duration_hours,
                 'guest_validation_timeout_minutes' => $this->guest_validation_timeout_minutes,
+                'guest_email_validation_enabled' => $this->guest_email_validation_enabled,
+                'guest_validation_delay_minutes' => $this->guest_validation_delay_minutes,
                 'consultant_max_duration_days' => $this->consultant_max_duration_days,
             ],
         ]);
