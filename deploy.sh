@@ -101,6 +101,14 @@ echo "---------------------------"
 
 cd "$PROJECT_DIR" || { echo "Dossier introuvable: $PROJECT_DIR"; exit 1; }
 
+echo "Vérification des dossiers pré-requis..."
+mkdir -p storage/framework/{cache,sessions,testing,views} bootstrap/cache
+
+echo "Vérification des propriétés et permissions pour l’exécution PHP-FPM"
+chown -R $WEBUSER:$WEBUSER storage bootstrap/cache
+find storage bootstrap/cache -type d -exec chmod 775 {} \;
+find storage bootstrap/cache -type f -exec chmod 664 {} \;
+
 # Get current git branch
 GIT_CURRENT_BRANCH=$(sudo -u $WEBUSER git rev-parse --abbrev-ref HEAD 2>/dev/null)
 if [ -z "$GIT_CURRENT_BRANCH" ]; then
