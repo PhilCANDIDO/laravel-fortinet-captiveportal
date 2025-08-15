@@ -49,7 +49,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         
         // User Management
         Route::prefix('users')->name('users.')->group(function () {
-            Route::get('/', \App\Livewire\Admin\Users\Index::class)->name('index');
+            Route::get('/', \App\Livewire\Admin\Users\Index::class)->name('index'); // Admin users
+            Route::get('/admins', \App\Livewire\Admin\Users\Index::class)->name('admins'); // Admin users (alias)
+            Route::get('/guests', \App\Livewire\Admin\GuestManagement::class)->name('guests');
+            Route::get('/consultants', \App\Livewire\Admin\ConsultantManagement::class)->name('consultants');
+            Route::get('/employees', \App\Livewire\Admin\EmployeeManagement::class)->name('employees');
         });
         
         // Audit Logs (placeholder)
@@ -62,6 +66,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Settings
         Route::prefix('settings')->name('settings.')->group(function () {
             Route::get('/', \App\Livewire\Admin\Settings\Index::class)->name('index');
+            Route::get('/fortigate', \App\Livewire\Admin\FortiGateSettings::class)->name('fortigate');
         });
     });
 });

@@ -1,0 +1,78 @@
+<?php
+
+return [
+    'registration_title' => 'Inscription Invité',
+    'registration_subtitle' => 'Accès temporaire au réseau (24 heures)',
+    'personal_info' => 'Informations personnelles',
+    'sponsor_info' => 'Informations du parrain',
+    'first_name' => 'Prénom',
+    'first_name_placeholder' => 'Entrez votre prénom',
+    'last_name' => 'Nom',
+    'last_name_placeholder' => 'Entrez votre nom',
+    'email' => 'Adresse email',
+    'email_placeholder' => 'votre.email@exemple.com',
+    'phone' => 'Téléphone',
+    'phone_optional' => 'Téléphone (optionnel)',
+    'phone_placeholder' => '+33 1 23 45 67 89',
+    'company' => 'Société',
+    'company_optional' => 'Société (optionnel)',
+    'company_placeholder' => 'Nom de votre société',
+    'sponsor_name' => 'Nom du parrain',
+    'sponsor_name_placeholder' => 'Employé qui vous a invité',
+    'sponsor_email' => 'Email du parrain',
+    'sponsor_email_placeholder' => 'parrain@societe.com',
+    'visit_reason' => 'Motif de la visite',
+    'visit_reason_optional' => 'Motif de la visite (optionnel)',
+    'visit_reason_placeholder' => 'Décrivez brièvement le but de votre visite',
+    'important_notice' => 'Avis important',
+    'validation_notice' => 'Vous devrez valider votre email dans les 30 minutes suivant l\'inscription.',
+    'register_button' => 'S\'inscrire',
+    
+    // Success page
+    'registration_success_title' => 'Inscription réussie!',
+    'registration_success_message' => 'Un email de validation a été envoyé à :email',
+    'validation_time_limit' => 'Vous avez 30 minutes pour valider votre compte.',
+    'next_steps_title' => 'Prochaines étapes',
+    'step_check_email' => 'Vérifiez votre boîte de réception',
+    'step_click_link' => 'Cliquez sur le lien de validation',
+    'step_accept_charter' => 'Acceptez la charte d\'utilisation',
+    'step_connect' => 'Connectez-vous au réseau',
+    'spam_notice' => 'Vérifiez également votre dossier spam si vous ne trouvez pas l\'email.',
+    
+    // Validation success
+    'validation_success_title' => 'Email validé avec succès!',
+    'validation_success_message' => 'Votre compte invité est maintenant actif.',
+    'account_details' => 'Détails du compte',
+    'valid_until' => 'Valide jusqu\'au',
+    'account_type' => 'Type de compte',
+    'charter_required' => 'Avant de pouvoir accéder au réseau, vous devez accepter notre charte d\'utilisation.',
+    'view_charter_button' => 'Voir la charte',
+    'connection_info' => 'Informations de connexion',
+    'connection_instructions' => 'Utilisez vos identifiants reçus par email pour vous connecter au réseau WiFi.',
+    
+    // Validation failed
+    'validation_failed_title' => 'Échec de la validation',
+    'validation_expired_message' => 'Le lien de validation a expiré.',
+    'validation_expired_explanation' => 'Les liens de validation sont valables 30 minutes. Votre compte a été supprimé et vous devez vous réinscrire.',
+    'validation_invalid_message' => 'Le lien de validation est invalide.',
+    'validation_invalid_explanation' => 'Ce lien a peut-être déjà été utilisé ou n\'est pas valide.',
+    'validation_error_message' => 'Une erreur s\'est produite lors de la validation.',
+    'validation_error_explanation' => 'Une erreur technique s\'est produite. Veuillez réessayer ou contacter le support.',
+    'register_again_button' => 'S\'inscrire à nouveau',
+    'contact_support' => 'Si le problème persiste, contactez votre administrateur réseau.',
+    
+    // Success page additions
+    'account_credentials' => 'Vos identifiants de connexion',
+    'username_label' => 'Nom d\'utilisateur',
+    'password_label' => 'Mot de passe',
+    'save_credentials_notice' => 'Veuillez sauvegarder ces identifiants en lieu sûr. Vous en aurez besoin pour vous connecter au réseau.',
+    'open_captive_portal' => 'Ouvrir le portail captif',
+    'register_another' => 'Enregistrer un autre invité',
+    
+    // Charter/Terms of Use
+    'charter_title' => 'Conditions d\'utilisation du réseau WiFi',
+    'charter_notice' => 'En acceptant ces conditions, vous reconnaissez avoir lu et compris les termes de cette charte.',
+    'accept_charter' => 'J\'accepte les conditions',
+    'decline_charter' => 'Annuler',
+    'processing' => 'Traitement',
+];
