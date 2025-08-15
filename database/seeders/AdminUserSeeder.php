@@ -17,7 +17,7 @@ class AdminUserSeeder extends Seeder
             'name' => 'Super Admin',
             'email' => 'superadmin@example.com',
             'role' => AdminUser::ROLE_SUPER_ADMIN,
-            'password' => 'SuperAdmin@Password123!',
+            'password' => 'azertyuiop',
             'email_verified_at' => now(),
             'is_active' => true,
             'password_changed_at' => now(),
