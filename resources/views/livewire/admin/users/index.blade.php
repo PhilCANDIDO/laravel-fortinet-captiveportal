@@ -21,26 +21,30 @@
             <!-- Filters -->
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                    <label for="search" class="block text-sm font-medium text-gray-700">Rechercher</label>
-                    <input wire:model.live="search" type="text" id="search" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Nom ou email...">
+                    <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Rechercher</label>
+                    <x-search-input wire:model.live="search" 
+                                    id="search"
+                                    placeholder="Nom ou email..." />
                 </div>
                 
                 <div>
-                    <label for="roleFilter" class="block text-sm font-medium text-gray-700">Rôle</label>
-                    <select wire:model.live="roleFilter" id="roleFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <label for="roleFilter" class="block text-sm font-medium text-gray-700 mb-2">Rôle</label>
+                    <x-select wire:model.live="roleFilter" 
+                              id="roleFilter">
                         <option value="">Tous les rôles</option>
                         <option value="admin">Administrateur</option>
                         <option value="super_admin">Super Admin</option>
-                    </select>
+                    </x-select>
                 </div>
                 
                 <div>
-                    <label for="statusFilter" class="block text-sm font-medium text-gray-700">Statut</label>
-                    <select wire:model.live="statusFilter" id="statusFilter" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <label for="statusFilter" class="block text-sm font-medium text-gray-700 mb-2">Statut</label>
+                    <x-select wire:model.live="statusFilter" 
+                              id="statusFilter">
                         <option value="">Tous les statuts</option>
                         <option value="1">Actif</option>
                         <option value="0">Inactif</option>
-                    </select>
+                    </x-select>
                 </div>
             </div>
         </div>

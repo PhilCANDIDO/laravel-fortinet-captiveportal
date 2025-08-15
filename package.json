@@ -17,6 +17,7 @@
     },
     "dependencies": {
         "alpinejs": "^3.14.9",
+        "flag-icons": "^7.5.0",
         "flowbite": "^3.1.2"
     }
 }

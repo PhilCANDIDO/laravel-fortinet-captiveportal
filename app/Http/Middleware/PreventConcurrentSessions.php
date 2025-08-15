@@ -14,6 +14,11 @@ class PreventConcurrentSessions
      */
     public function handle(Request $request, Closure $next)
     {
+        // Check if concurrent session prevention is disabled
+        if (config('app.env') === 'local' || config('auth.prevent_concurrent_sessions', true) === false) {
+            return $next($request);
+        }
+        
         if (Auth::guard('admin')->check()) {
             $user = Auth::guard('admin')->user();
             $currentSessionId = session()->getId();
@@ -25,13 +30,19 @@ class PreventConcurrentSessions
                 ->first();
             
             if (!$session) {
-                // Check if ANY active session exists for this user
-                $hasActiveSession = AdminSession::where('admin_user_id', $user->id)
+                // Clean up old sessions that are older than 24 hours (likely from container restarts)
+                AdminSession::where('admin_user_id', $user->id)
+                    ->where('last_activity', '<', \Carbon\Carbon::now()->subDay()->timestamp)
+                    ->delete();
+                
+                // Check if ANY active session exists for this user that was active in the last hour
+                $hasRecentActiveSession = AdminSession::where('admin_user_id', $user->id)
                     ->where('is_active', true)
+                    ->where('last_activity', '>', \Carbon\Carbon::now()->subHour()->timestamp)
                     ->exists();
                 
-                if ($hasActiveSession) {
-                    // Another session exists, so this one was invalidated
+                if ($hasRecentActiveSession) {
+                    // Another recent session exists, so this one was invalidated
                     Auth::guard('admin')->logout();
                     $request->session()->invalidate();
                     $request->session()->regenerateToken();
@@ -39,7 +50,11 @@ class PreventConcurrentSessions
                     return redirect()->route('admin.login')
                         ->with('warning', __('auth.session_invalidated'));
                 } else {
-                    // No session exists at all, create one (happens during first login flow)
+                    // No recent session exists, deactivate old ones and create new one
+                    AdminSession::where('admin_user_id', $user->id)
+                        ->where('is_active', true)
+                        ->update(['is_active' => false]);
+                    
                     AdminSession::create([
                         'id' => $currentSessionId,
                         'admin_user_id' => $user->id,

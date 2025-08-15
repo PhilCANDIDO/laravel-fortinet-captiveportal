@@ -55,6 +55,8 @@ class Verify extends Component
     
     public function render()
     {
-        return view('livewire.admin.mfa.verify')->layout('layouts.guest');
+        return view('livewire.admin.mfa.verify')
+            ->extends('layouts.guest')
+            ->section('content');
     }
 }

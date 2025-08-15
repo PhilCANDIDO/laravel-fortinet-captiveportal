@@ -126,4 +126,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent Concurrent Sessions
+    |--------------------------------------------------------------------------
+    |
+    | This option controls whether to prevent concurrent sessions for admin users.
+    | When enabled, if a user logs in from another location, their previous
+    | session will be invalidated. Set to false to disable this feature.
+    | In local environment, this is automatically disabled.
+    |
+    */
+
+    'prevent_concurrent_sessions' => env('PREVENT_CONCURRENT_SESSIONS', true),
+
 ];

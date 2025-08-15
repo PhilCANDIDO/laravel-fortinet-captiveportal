@@ -122,37 +122,110 @@
 
             <!-- Charter Settings -->
             @if($activeTab === 'charter')
-                <form wire:submit="saveCharterSettings" class="space-y-6">
-                    <div>
-                        <label for="charter_text_fr" class="block text-sm font-medium text-gray-700">Charte d'utilisation (Français)</label>
-                        <textarea wire:model="charter_text_fr" id="charter_text_fr" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                        @error('charter_text_fr') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                <div class="space-y-6">
+                    <!-- Markdown Help -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-blue-900 mb-2">Formatage Markdown</h4>
+                        <div class="text-xs text-blue-700 grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="mb-1"><code class="bg-blue-100 px-1"># Titre 1</code> → Titre principal</p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">## Titre 2</code> → Sous-titre</p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">**texte**</code> → <strong>texte en gras</strong></p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">*texte*</code> → <em>texte en italique</em></p>
+                            </div>
+                            <div>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">- élément</code> → Liste à puces</p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">1. élément</code> → Liste numérotée</p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">> citation</code> → Citation</p>
+                                <p class="mb-1"><code class="bg-blue-100 px-1">---</code> → Ligne horizontale</p>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <form wire:submit="saveCharterSettings" class="space-y-6">
+                        <!-- French Charter -->
+                        <div x-data="{ showPreview: false }">
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="charter_text_fr" class="block text-sm font-medium text-gray-700">Charte d'utilisation (Français)</label>
+                                <button type="button" @click="showPreview = !showPreview" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <span x-text="showPreview ? 'Éditer' : 'Aperçu'"></span>
+                                </button>
+                            </div>
+                            <div x-show="!showPreview">
+                                <textarea wire:model="charter_text_fr" id="charter_text_fr" rows="10" 
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
+                                          placeholder="# Titre de la charte&#10;&#10;## Section 1&#10;Contenu en **markdown**..."></textarea>
+                                @error('charter_text_fr') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
+                            <div x-show="showPreview" class="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 p-4 prose prose-sm max-w-none max-h-64 overflow-y-auto">
+                                {!! app(\App\Services\MarkdownService::class)->parseWithStyles($charter_text_fr) !!}
+                            </div>
+                        </div>
 
-                    <div>
-                        <label for="charter_text_en" class="block text-sm font-medium text-gray-700">Terms of Use (English)</label>
-                        <textarea wire:model="charter_text_en" id="charter_text_en" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                        @error('charter_text_en') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                    </div>
+                        <!-- English Charter -->
+                        <div x-data="{ showPreview: false }">
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="charter_text_en" class="block text-sm font-medium text-gray-700">Terms of Use (English)</label>
+                                <button type="button" @click="showPreview = !showPreview" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <span x-text="showPreview ? 'Edit' : 'Preview'"></span>
+                                </button>
+                            </div>
+                            <div x-show="!showPreview">
+                                <textarea wire:model="charter_text_en" id="charter_text_en" rows="10" 
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
+                                          placeholder="# Charter Title&#10;&#10;## Section 1&#10;Content in **markdown**..."></textarea>
+                                @error('charter_text_en') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
+                            <div x-show="showPreview" class="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 p-4 prose prose-sm max-w-none max-h-64 overflow-y-auto">
+                                {!! app(\App\Services\MarkdownService::class)->parseWithStyles($charter_text_en) !!}
+                            </div>
+                        </div>
 
-                    <div>
-                        <label for="charter_text_it" class="block text-sm font-medium text-gray-700">Termini di utilizzo (Italiano)</label>
-                        <textarea wire:model="charter_text_it" id="charter_text_it" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                        @error('charter_text_it') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                    </div>
+                        <!-- Italian Charter -->
+                        <div x-data="{ showPreview: false }">
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="charter_text_it" class="block text-sm font-medium text-gray-700">Termini di utilizzo (Italiano)</label>
+                                <button type="button" @click="showPreview = !showPreview" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <span x-text="showPreview ? 'Modifica' : 'Anteprima'"></span>
+                                </button>
+                            </div>
+                            <div x-show="!showPreview">
+                                <textarea wire:model="charter_text_it" id="charter_text_it" rows="10" 
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
+                                          placeholder="# Titolo della carta&#10;&#10;## Sezione 1&#10;Contenuto in **markdown**..."></textarea>
+                                @error('charter_text_it') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
+                            <div x-show="showPreview" class="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 p-4 prose prose-sm max-w-none max-h-64 overflow-y-auto">
+                                {!! app(\App\Services\MarkdownService::class)->parseWithStyles($charter_text_it) !!}
+                            </div>
+                        </div>
 
-                    <div>
-                        <label for="charter_text_es" class="block text-sm font-medium text-gray-700">Términos de uso (Español)</label>
-                        <textarea wire:model="charter_text_es" id="charter_text_es" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
-                        @error('charter_text_es') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
-                    </div>
-
-                    <div class="flex justify-end">
-                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                            Enregistrer
-                        </button>
-                    </div>
-                </form>
+                        <!-- Spanish Charter -->
+                        <div x-data="{ showPreview: false }">
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="charter_text_es" class="block text-sm font-medium text-gray-700">Términos de uso (Español)</label>
+                                <button type="button" @click="showPreview = !showPreview" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <span x-text="showPreview ? 'Editar' : 'Vista previa'"></span>
+                                </button>
+                            </div>
+                            <div x-show="!showPreview">
+                                <textarea wire:model="charter_text_es" id="charter_text_es" rows="10" 
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm font-mono"
+                                          placeholder="# Título de la carta&#10;&#10;## Sección 1&#10;Contenido en **markdown**..."></textarea>
+                                @error('charter_text_es') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                            </div>
+                            <div x-show="showPreview" class="mt-1 block w-full rounded-md border border-gray-300 bg-gray-50 p-4 prose prose-sm max-w-none max-h-64 overflow-y-auto">
+                                {!! app(\App\Services\MarkdownService::class)->parseWithStyles($charter_text_es) !!}
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-end">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
             @endif
 
             <!-- Email Settings -->

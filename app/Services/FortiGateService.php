@@ -1,0 +1,590 @@
+<?php
+
+namespace App\Services;
+
+use App\Exceptions\FortiGateApiException;
+use App\Exceptions\FortiGateConnectionException;
+use App\Models\FortiGateSettings;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\Response;
+use Illuminate\Http\Client\PendingRequest;
+use Exception;
+
+class FortiGateService
+{
+    protected string $apiUrl;
+    protected ?string $apiToken;
+    protected array $config;
+    protected FortiGateSettings $settings;
+    protected ?string $circuitBreakerKey = 'fortigate_circuit_breaker';
+    protected array $metrics = [
+        'requests' => 0,
+        'successes' => 0,
+        'failures' => 0,
+        'total_response_time' => 0,
+    ];
+
+    public function __construct()
+    {
+        // Load settings from database
+        $this->settings = FortiGateSettings::current();
+        
+        // Use database settings
+        $this->config = $this->settings->toConfig();
+        
+        // If no database settings, fallback to config file
+        if (empty($this->config['api_url'])) {
+            $this->config = config('fortigate', []);
+        }
+        
+        $this->apiUrl = rtrim($this->config['api_url'] ?? '', '/');
+        $this->apiToken = $this->config['api_token'] ?? null;
+    }
+    
+    /**
+     * Check if FortiGate service is properly configured and active
+     */
+    public function isConfigured(): bool
+    {
+        return !empty($this->apiUrl) 
+            && !empty($this->apiToken) 
+            && $this->settings->is_active;
+    }
+
+    /**
+     * Create a new user in FortiGate
+     */
+    public function createUser(array $userData): array
+    {
+        if (!$this->isConfigured()) {
+            throw new FortiGateConnectionException('FortiGate service is not configured');
+        }
+        
+        $endpoint = '/cmdb/user/local';
+        
+        $payload = [
+            'name' => $userData['username'],
+            'passwd' => $userData['password'],
+            'status' => $userData['status'] ?? 'enable',
+            'type' => 'password',
+            'two-factor' => 'disable',
+            'email-to' => $userData['email'] ?? '',
+        ];
+        
+        // Only add groups if configured
+        if (!empty($this->settings->user_group)) {
+            $payload['groups'] = [
+                ['name' => $this->settings->user_group]
+            ];
+        }
+
+        if (isset($userData['expires_at'])) {
+            $payload['expiry-date'] = $userData['expires_at'];
+        }
+
+        return $this->request('POST', $endpoint, $payload);
+    }
+
+    /**
+     * Update an existing user in FortiGate
+     */
+    public function updateUser(string $username, array $userData): array
+    {
+        if (!$this->isConfigured()) {
+            throw new FortiGateConnectionException('FortiGate service is not configured');
+        }
+        
+        $endpoint = "/cmdb/user/local/{$username}";
+        
+        $payload = [];
+        
+        if (isset($userData['password'])) {
+            $payload['passwd'] = $userData['password'];
+        }
+        
+        if (isset($userData['status'])) {
+            $payload['status'] = $userData['status'];
+        }
+        
+        if (isset($userData['email'])) {
+            $payload['email-to'] = $userData['email'];
+        }
+        
+        if (isset($userData['expires_at'])) {
+            $payload['expiry-date'] = $userData['expires_at'];
+        }
+
+        return $this->request('PUT', $endpoint, $payload);
+    }
+
+    /**
+     * Remove user from group before deletion
+     */
+    public function removeUserFromGroup(string $username): bool
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+        
+        // If no group is configured, nothing to remove
+        if (empty($this->settings->user_group)) {
+            return true;
+        }
+        
+        try {
+            // Update user to remove from all groups
+            $endpoint = "/cmdb/user/local/{$username}";
+            $payload = [
+                'groups' => []  // Empty groups array removes from all groups
+            ];
+            
+            $this->request('PUT', $endpoint, $payload);
+            return true;
+        } catch (Exception $e) {
+            // Log the error but don't fail the deletion process
+            Log::warning("Failed to remove user from group before deletion: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    /**
+     * Delete a user from FortiGate
+     */
+    public function deleteUser(string $username): bool
+    {
+        if (!$this->isConfigured()) {
+            throw new FortiGateConnectionException('FortiGate service is not configured');
+        }
+        
+        // First try to remove user from group
+        $this->removeUserFromGroup($username);
+        
+        // Then delete the user
+        $endpoint = "/cmdb/user/local/{$username}";
+        
+        try {
+            $this->request('DELETE', $endpoint);
+            return true;
+        } catch (Exception $e) {
+            if ($e instanceof FortiGateApiException && $e->getHttpStatusCode() === 404) {
+                // User doesn't exist, consider it as successfully deleted
+                return true;
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Get user information from FortiGate
+     */
+    public function getUser(string $username): ?array
+    {
+        $endpoint = "/cmdb/user/local/{$username}";
+        
+        try {
+            $response = $this->request('GET', $endpoint);
+            return $response['results'][0] ?? null;
+        } catch (FortiGateApiException $e) {
+            if ($e->getHttpStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Get all users from FortiGate
+     */
+    public function getAllUsers(): array
+    {
+        $endpoint = '/cmdb/user/local';
+        
+        $response = $this->request('GET', $endpoint);
+        return $response['results'] ?? [];
+    }
+
+    /**
+     * Get active user sessions
+     */
+    public function getActiveSessions(): array
+    {
+        $endpoint = '/monitor/user/info';
+        
+        $cacheKey = $this->getCacheKey('sessions');
+        
+        if ($this->config['cache']['enabled']) {
+            return Cache::remember($cacheKey, $this->config['cache']['ttl'], function () use ($endpoint) {
+                $response = $this->request('GET', $endpoint);
+                return $response['results'] ?? [];
+            });
+        }
+        
+        $response = $this->request('GET', $endpoint);
+        return $response['results'] ?? [];
+    }
+
+    /**
+     * Get sessions for a specific user
+     */
+    public function getUserSessions(string $username): array
+    {
+        $sessions = $this->getActiveSessions();
+        
+        return array_filter($sessions, function ($session) use ($username) {
+            return $session['username'] === $username;
+        });
+    }
+
+    /**
+     * Terminate user session
+     */
+    public function terminateSession(string $username, ?string $ipAddress = null): bool
+    {
+        $endpoint = '/monitor/user/kick';
+        
+        $payload = [
+            'username' => $username,
+        ];
+        
+        if ($ipAddress) {
+            $payload['ip'] = $ipAddress;
+        }
+
+        try {
+            $this->request('POST', $endpoint, $payload);
+            
+            // Clear session cache
+            if ($this->config['cache']['enabled']) {
+                Cache::forget($this->getCacheKey('sessions'));
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            Log::error('Failed to terminate session', [
+                'username' => $username,
+                'ip' => $ipAddress,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if a user exists in FortiGate
+     */
+    public function userExists(string $username): bool
+    {
+        return $this->getUser($username) !== null;
+    }
+
+    /**
+     * Enable a user account
+     */
+    public function enableUser(string $username): bool
+    {
+        return $this->updateUser($username, ['status' => 'enable']);
+    }
+
+    /**
+     * Disable a user account
+     */
+    public function disableUser(string $username): bool
+    {
+        return $this->updateUser($username, ['status' => 'disable']);
+    }
+
+    /**
+     * Make HTTP request to FortiGate API with retry logic
+     */
+    protected function request(string $method, string $endpoint, array $data = []): array
+    {
+        // Check circuit breaker
+        if ($this->isCircuitOpen()) {
+            throw new FortiGateConnectionException('Circuit breaker is open');
+        }
+
+        $url = $this->apiUrl . $endpoint;
+        $attempts = 0;
+        $lastException = null;
+        $startTime = microtime(true);
+
+        while ($attempts < $this->config['retry']['max_attempts']) {
+            try {
+                $response = $this->executeRequest($method, $url, $data);
+                
+                $this->recordSuccess(microtime(true) - $startTime);
+                
+                return $this->handleResponse($response, $endpoint);
+                
+            } catch (Exception $e) {
+                $lastException = $e;
+                $attempts++;
+                
+                if ($attempts < $this->config['retry']['max_attempts']) {
+                    $delay = $this->calculateRetryDelay($attempts);
+                    
+                    Log::warning('FortiGate API request failed, retrying', [
+                        'attempt' => $attempts,
+                        'delay' => $delay,
+                        'endpoint' => $endpoint,
+                        'error' => $e->getMessage(),
+                    ]);
+                    
+                    usleep($delay * 1000);
+                }
+            }
+        }
+
+        $this->recordFailure(microtime(true) - $startTime);
+        
+        throw $lastException ?? new FortiGateApiException('Request failed after all retries');
+    }
+
+    /**
+     * Execute the actual HTTP request
+     */
+    protected function executeRequest(string $method, string $url, array $data = []): Response
+    {
+        $client = $this->getHttpClient();
+        
+        if ($this->config['logging']['log_requests']) {
+            Log::debug('FortiGate API Request', [
+                'method' => $method,
+                'url' => $url,
+                'data' => $method !== 'GET' ? $data : null,
+            ]);
+        }
+
+        $response = match (strtoupper($method)) {
+            'GET' => $client->get($url, $data),
+            'POST' => $client->post($url, $data),
+            'PUT' => $client->put($url, $data),
+            'DELETE' => $client->delete($url),
+            default => throw new FortiGateApiException("Unsupported HTTP method: {$method}"),
+        };
+
+        if ($this->config['logging']['log_responses']) {
+            Log::debug('FortiGate API Response', [
+                'status' => $response->status(),
+                'body' => $response->json(),
+            ]);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Get configured HTTP client
+     */
+    protected function getHttpClient(): PendingRequest
+    {
+        return Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiToken,
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])
+        ->timeout($this->config['timeout'])
+        ->withOptions([
+            'verify' => $this->config['verify_ssl'],
+        ])
+        ->throw(function ($response, $e) {
+            if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
+                $exception = new FortiGateConnectionException($e->getMessage());
+                $exception->setIsTimeout(str_contains($e->getMessage(), 'timeout'));
+                $exception->setIsNetworkError(true);
+                throw $exception;
+            }
+        });
+    }
+
+    /**
+     * Handle API response
+     */
+    protected function handleResponse(Response $response, string $endpoint): array
+    {
+        if (!$response->successful()) {
+            $exception = new FortiGateApiException(
+                "FortiGate API error: {$response->status()}"
+            );
+            
+            $exception->setApiEndpoint($endpoint)
+                      ->setHttpStatusCode($response->status())
+                      ->setApiResponse($response->json());
+            
+            throw $exception;
+        }
+
+        $data = $response->json();
+        
+        if (isset($data['status']) && $data['status'] !== 'success') {
+            throw new FortiGateApiException(
+                "FortiGate API returned error: " . ($data['message'] ?? 'Unknown error')
+            );
+        }
+
+        return $data;
+    }
+
+    /**
+     * Calculate retry delay with exponential backoff
+     */
+    protected function calculateRetryDelay(int $attempt): int
+    {
+        $delay = $this->config['retry']['initial_delay'] * 
+                 pow($this->config['retry']['multiplier'], $attempt - 1);
+        
+        return min($delay, $this->config['retry']['max_delay']);
+    }
+
+    /**
+     * Check if circuit breaker is open
+     */
+    protected function isCircuitOpen(): bool
+    {
+        if (!$this->config['circuit_breaker']) {
+            return false;
+        }
+
+        $state = Cache::get($this->circuitBreakerKey, [
+            'failures' => 0,
+            'last_failure' => null,
+            'state' => 'closed',
+        ]);
+
+        if ($state['state'] === 'open') {
+            $recoveryTime = $state['last_failure'] + $this->config['circuit_breaker']['recovery_time'];
+            
+            if (time() > $recoveryTime) {
+                // Move to half-open state
+                $state['state'] = 'half-open';
+                Cache::put($this->circuitBreakerKey, $state, 3600);
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Record successful request
+     */
+    protected function recordSuccess(float $responseTime): void
+    {
+        $this->metrics['requests']++;
+        $this->metrics['successes']++;
+        $this->metrics['total_response_time'] += $responseTime;
+
+        $state = Cache::get($this->circuitBreakerKey, [
+            'failures' => 0,
+            'successes' => 0,
+            'last_failure' => null,
+            'state' => 'closed',
+        ]);
+
+        if ($state['state'] === 'half-open') {
+            $state['successes']++;
+            
+            if ($state['successes'] >= $this->config['circuit_breaker']['success_threshold']) {
+                // Close the circuit
+                $state = [
+                    'failures' => 0,
+                    'successes' => 0,
+                    'last_failure' => null,
+                    'state' => 'closed',
+                ];
+            }
+            
+            Cache::put($this->circuitBreakerKey, $state, 3600);
+        }
+    }
+
+    /**
+     * Record failed request
+     */
+    protected function recordFailure(float $responseTime): void
+    {
+        $this->metrics['requests']++;
+        $this->metrics['failures']++;
+        $this->metrics['total_response_time'] += $responseTime;
+
+        $state = Cache::get($this->circuitBreakerKey, [
+            'failures' => 0,
+            'successes' => 0,
+            'last_failure' => null,
+            'state' => 'closed',
+        ]);
+
+        $state['failures']++;
+        $state['last_failure'] = time();
+
+        if ($state['failures'] >= $this->config['circuit_breaker']['failure_threshold']) {
+            // Open the circuit
+            $state['state'] = 'open';
+            
+            Log::warning('FortiGate circuit breaker opened', [
+                'failures' => $state['failures'],
+            ]);
+        }
+
+        Cache::put($this->circuitBreakerKey, $state, 3600);
+    }
+
+    /**
+     * Get cache key
+     */
+    protected function getCacheKey(string $type, ...$params): string
+    {
+        $prefix = $this->config['cache']['prefix'];
+        $key = implode(':', array_merge([$prefix, $type], $params));
+        return $key;
+    }
+
+    /**
+     * Get service metrics
+     */
+    public function getMetrics(): array
+    {
+        $avgResponseTime = $this->metrics['requests'] > 0 
+            ? $this->metrics['total_response_time'] / $this->metrics['requests']
+            : 0;
+
+        return [
+            'total_requests' => $this->metrics['requests'],
+            'successful_requests' => $this->metrics['successes'],
+            'failed_requests' => $this->metrics['failures'],
+            'average_response_time' => round($avgResponseTime, 3),
+            'success_rate' => $this->metrics['requests'] > 0 
+                ? round(($this->metrics['successes'] / $this->metrics['requests']) * 100, 2)
+                : 0,
+        ];
+    }
+
+    /**
+     * Health check for FortiGate API
+     */
+    public function healthCheck(): array
+    {
+        try {
+            $startTime = microtime(true);
+            $users = $this->getAllUsers();
+            $responseTime = microtime(true) - $startTime;
+            
+            return [
+                'status' => 'healthy',
+                'response_time' => round($responseTime, 3),
+                'api_url' => $this->apiUrl,
+                'circuit_breaker' => Cache::get($this->circuitBreakerKey, ['state' => 'closed'])['state'],
+            ];
+        } catch (Exception $e) {
+            return [
+                'status' => 'unhealthy',
+                'error' => $e->getMessage(),
+                'api_url' => $this->apiUrl,
+                'circuit_breaker' => Cache::get($this->circuitBreakerKey, ['state' => 'closed'])['state'],
+            ];
+        }
+    }
+}
