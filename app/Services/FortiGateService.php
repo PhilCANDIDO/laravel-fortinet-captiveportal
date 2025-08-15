@@ -71,10 +71,14 @@ class FortiGateService
             'type' => 'password',
             'two-factor' => 'disable',
             'email-to' => $userData['email'] ?? '',
-            'groups' => [
-                ['name' => $this->config['user_group']]
-            ],
         ];
+        
+        // Only add groups if configured
+        if (!empty($this->settings->user_group)) {
+            $payload['groups'] = [
+                ['name' => $this->settings->user_group]
+            ];
+        }
 
         if (isset($userData['expires_at'])) {
             $payload['expiry-date'] = $userData['expires_at'];
@@ -116,6 +120,36 @@ class FortiGateService
     }
 
     /**
+     * Remove user from group before deletion
+     */
+    public function removeUserFromGroup(string $username): bool
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+        
+        // If no group is configured, nothing to remove
+        if (empty($this->settings->user_group)) {
+            return true;
+        }
+        
+        try {
+            // Update user to remove from all groups
+            $endpoint = "/cmdb/user/local/{$username}";
+            $payload = [
+                'groups' => []  // Empty groups array removes from all groups
+            ];
+            
+            $this->request('PUT', $endpoint, $payload);
+            return true;
+        } catch (Exception $e) {
+            // Log the error but don't fail the deletion process
+            Log::warning("Failed to remove user from group before deletion: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    /**
      * Delete a user from FortiGate
      */
     public function deleteUser(string $username): bool
@@ -124,6 +158,10 @@ class FortiGateService
             throw new FortiGateConnectionException('FortiGate service is not configured');
         }
         
+        // First try to remove user from group
+        $this->removeUserFromGroup($username);
+        
+        // Then delete the user
         $endpoint = "/cmdb/user/local/{$username}";
         
         try {

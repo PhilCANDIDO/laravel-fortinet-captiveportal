@@ -94,7 +94,7 @@ class GuestRegistrationController extends Controller
             return redirect()->route('guest.register.success')
                 ->with('email', $user->email)
                 ->with('password', $password)
-                ->with('username', $user->email);
+                ->with('username', $user->fortigate_username ?? $user->email);
                 
         } catch (\Exception $e) {
             DB::rollBack();
