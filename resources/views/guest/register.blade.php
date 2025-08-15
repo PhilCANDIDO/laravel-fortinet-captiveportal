@@ -117,7 +117,8 @@
                                 <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
                                 </svg>
-                                <span x-text="isSubmitting ? '{{ __('guest.processing') }}...' : '{{ __('guest.register_button') }}'"></span>
+                                <span x-show="!isSubmitting">{{ __('guest.register_button') }}</span>
+                                <span x-show="isSubmitting">{{ __('guest.processing') }}...</span>
                             </button>
                         </div>
                     </div>
