@@ -9,7 +9,7 @@
 #
 # Options:
 #   --php-fpm-service=NAME   PHP-FPM service name (default: php8.4-fpm)
-#   --webuser=USER           Web server user (default: apache for RHEL or CentOS, www-data for Debian or Ubuntu)
+#   --webuser=USER           Web server user (default: nginx for RHEL or CentOS, www-data for Debian or Ubuntu)
 #   --force-git-rebase       Force reset to remote branch (overwrites local changes)
 #   --backup-cron            Setup daily backup cron job at 23:00
 #   --help                   Show this help message
@@ -23,8 +23,8 @@
 
 # Default configuration
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PHP_FPM_SERVICE="php8.4-fpm"
-WEBUSER="apache"
+PHP_FPM_SERVICE="php-fpm"
+WEBUSER="nginx"
 FORCE_GIT_REBASE=false
 SETUP_BACKUP_CRON=false
 

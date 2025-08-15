@@ -269,6 +269,25 @@
                                 @error('guest_validation_timeout_minutes') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                             </div>
                         </div>
+                        
+                        <!-- Email Validation Settings -->
+                        <div class="mt-4 space-y-4">
+                            <div class="flex items-center">
+                                <input wire:model="guest_email_validation_enabled" type="checkbox" id="guest_email_validation_enabled" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                <label for="guest_email_validation_enabled" class="ml-2 block text-sm font-medium text-gray-700">
+                                    Activer la validation par email pour les invités
+                                </label>
+                            </div>
+                            
+                            <div x-show="$wire.guest_email_validation_enabled" x-transition>
+                                <label for="guest_validation_delay_minutes" class="block text-sm font-medium text-gray-700">
+                                    Délai avant désactivation du compte non validé (minutes)
+                                </label>
+                                <input wire:model="guest_validation_delay_minutes" type="number" id="guest_validation_delay_minutes" min="5" max="1440" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                @error('guest_validation_delay_minutes') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                <p class="mt-1 text-xs text-gray-500">Si la validation par email est désactivée, les comptes invités sont immédiatement actifs.</p>
+                            </div>
+                        </div>
                     </div>
 
                     <div>

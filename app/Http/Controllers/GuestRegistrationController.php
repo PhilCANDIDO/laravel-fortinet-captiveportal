@@ -168,10 +168,18 @@ class GuestRegistrationController extends Controller
                 if ($this->fortiGateService->isConfigured()) {
                     $username = $user->fortigate_username ?? $user->email;
                     
-                    // Update the user to enable status
+                    // Update the user to enable status and ensure they're in the group
                     $userData = [
                         'status' => 'enable',
                     ];
+                    
+                    // Also ensure the user is in the configured group
+                    $settings = \App\Models\FortiGateSettings::current();
+                    if (!empty($settings->user_group)) {
+                        $userData['groups'] = [
+                            ['name' => $settings->user_group]
+                        ];
+                    }
                     
                     $this->fortiGateService->updateUser($username, $userData);
                     $user->fortigate_sync_status = User::SYNC_SYNCED;
