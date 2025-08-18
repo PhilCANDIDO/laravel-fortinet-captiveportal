@@ -241,45 +241,10 @@ class PortalDataService
             }
         }
 
-        // Add or override authentication parameters
-        $formFields = $portalData['form_fields'] ?? [];
-        
-        // Username field (default to 'username' if not specified)
-        $usernameField = $formFields['username_field'] ?? 'username';
-        $queryParams[$usernameField] = $username;
-        
-        // Password field (default to 'password' if not specified)
-        $passwordField = $formFields['password_field'] ?? 'password';
-        $queryParams[$passwordField] = $password;
-        
-        // Magic token if present and not already in URL
-        if (!empty($portalData['magic']) && !isset($queryParams[$portalData['magic']])) {
-            $magicField = $formFields['magic_field'] ?? 'magic';
-            // If magic field is 'magic', add it as a parameter
-            if ($magicField === 'magic') {
-                $queryParams[$magicField] = $portalData['magic'];
-            }
-        }
-        
-        // Redirect URL if present
-        if (!empty($portalData['redirect_url'])) {
-            $redirectField = $formFields['redirect_field'] ?? 'redir';  // FortiGate typically uses 'redir'
-            $queryParams[$redirectField] = $portalData['redirect_url'];
-        }
-
-        // Add any additional parameters from portal data
-        if (!empty($portalData['client_mac'])) {
-            $queryParams['client_mac'] = $portalData['client_mac'];
-        }
-        if (!empty($portalData['client_ip'])) {
-            $queryParams['client_ip'] = $portalData['client_ip'];
-        }
-        if (!empty($portalData['ap_mac'])) {
-            $queryParams['ap_mac'] = $portalData['ap_mac'];
-        }
-        if (!empty($portalData['ssid'])) {
-            $queryParams['ssid'] = $portalData['ssid'];
-        }
+        // For FortiGate, we use auto_username and auto_password parameters
+        // These will be picked up by the JavaScript in the FortiGate login page
+        $queryParams['auto_username'] = $username;
+        $queryParams['auto_password'] = $password;
 
         // Build the final URL
         $scheme = $urlParts['scheme'] ?? 'https';

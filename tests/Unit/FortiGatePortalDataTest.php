@@ -67,9 +67,8 @@ class FortiGatePortalDataTest extends TestCase
         $url = $this->service->generateAuthUrl($portalData, 'guest-10', 'TestPass123!');
         
         $this->assertStringContainsString('http://192.168.20.1:1000/fgtauth?050d0496b5579426', $url);
-        $this->assertStringContainsString('username=guest-10', $url);
-        $this->assertStringContainsString('password=TestPass123', $url);
-        $this->assertStringContainsString('4Tredir=' . urlencode('http://google.fr/'), $url);
+        $this->assertStringContainsString('auto_username=guest-10', $url);
+        $this->assertStringContainsString('auto_password=TestPass123', $url);
     }
 
     public function test_portal_info_extraction_with_minimal_data()
