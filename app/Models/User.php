@@ -77,6 +77,12 @@ class User extends Authenticatable
         'remember_token',
         'validation_token',
     ];
+    
+    /**
+     * Temporary password (not persisted to database)
+     * @var string|null
+     */
+    public $temp_password;
 
     /**
      * Get the attributes that should be cast.
@@ -219,10 +225,16 @@ class User extends Authenticatable
      */
     public function generateFortiGateUsername(): string
     {
+        // For guests, use guest-{id} pattern
+        if ($this->user_type === self::TYPE_GUEST) {
+            // If ID is not set yet (new record), we'll update it after save
+            return $this->id ? "guest-{$this->id}" : "guest-pending";
+        }
+        
+        // For other types, keep the existing pattern
         $prefix = match($this->user_type) {
             self::TYPE_EMPLOYEE => 'emp',
             self::TYPE_CONSULTANT => 'con',
-            self::TYPE_GUEST => 'gst',
             default => 'usr',
         };
         
@@ -340,14 +352,25 @@ class User extends Authenticatable
      */
     public function updateFortiGateSync(string $status, string $error = null): void
     {
+        // Update the database directly to avoid saving temp_password
+        $updates = [
+            'fortigate_sync_status' => $status,
+            'fortigate_sync_error' => $error,
+        ];
+        
+        if ($status === self::SYNC_SYNCED) {
+            $updates['fortigate_synced_at'] = Carbon::now();
+        }
+        
+        // Update only the specific fields in the database
+        self::where('id', $this->id)->update($updates);
+        
+        // Update the model attributes too
         $this->fortigate_sync_status = $status;
         $this->fortigate_sync_error = $error;
-        
         if ($status === self::SYNC_SYNCED) {
             $this->fortigate_synced_at = Carbon::now();
         }
-        
-        $this->save();
     }
 
     /**

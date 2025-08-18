@@ -80,19 +80,21 @@
                                         <div class="text-sm text-gray-900">{{ $guest->company_name ?? '-' }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        @if($guest->validated_at)
-                                            @if($guest->is_active)
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                    Actif
-                                                </span>
-                                            @else
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                                    Inactif
-                                                </span>
-                                            @endif
-                                        @else
+                                        @if($guest->is_active)
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                Actif
+                                            </span>
+                                        @elseif($guest->status === 'suspended')
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                Suspendu
+                                            </span>
+                                        @elseif(!$guest->validated_at && $guest->validation_token)
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                                Non validé
+                                                En attente de validation
+                                            </span>
+                                        @else
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                Inactif
                                             </span>
                                         @endif
                                     </td>
@@ -111,7 +113,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div class="flex items-center justify-end space-x-2">
-                                            @if(!$guest->validated_at)
+                                            @if(!$guest->validated_at && $guest->validation_token && \App\Models\Setting::isGuestEmailValidationEnabled())
                                             <button wire:click="resendValidationEmail({{ $guest->id }})" 
                                                     wire:loading.attr="disabled"
                                                     class="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"

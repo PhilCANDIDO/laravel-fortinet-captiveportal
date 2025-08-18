@@ -9,7 +9,7 @@
 #
 # Options:
 #   --php-fpm-service=NAME   PHP-FPM service name (default: php8.4-fpm)
-#   --webuser=USER           Web server user (default: apache for RHEL or CentOS, www-data for Debian or Ubuntu)
+#   --webuser=USER           Web server user (default: nginx for RHEL or CentOS, www-data for Debian or Ubuntu)
 #   --force-git-rebase       Force reset to remote branch (overwrites local changes)
 #   --backup-cron            Setup daily backup cron job at 23:00
 #   --help                   Show this help message
@@ -23,8 +23,8 @@
 
 # Default configuration
 PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PHP_FPM_SERVICE="php8.4-fpm"
-WEBUSER="apache"
+PHP_FPM_SERVICE="php-fpm"
+WEBUSER="nginx"
 FORCE_GIT_REBASE=false
 SETUP_BACKUP_CRON=false
 
@@ -100,6 +100,14 @@ echo "  FORCE_GIT_REBASE: $FORCE_GIT_REBASE"
 echo "---------------------------"
 
 cd "$PROJECT_DIR" || { echo "Dossier introuvable: $PROJECT_DIR"; exit 1; }
+
+echo "Vérification des dossiers pré-requis..."
+mkdir -p storage/framework/{cache,sessions,testing,views} bootstrap/cache
+
+echo "Vérification des propriétés et permissions pour l’exécution PHP-FPM"
+chown -R $WEBUSER:$WEBUSER storage bootstrap/cache
+find storage bootstrap/cache -type d -exec chmod 775 {} \;
+find storage bootstrap/cache -type f -exec chmod 664 {} \;
 
 # Get current git branch
 GIT_CURRENT_BRANCH=$(sudo -u $WEBUSER git rev-parse --abbrev-ref HEAD 2>/dev/null)

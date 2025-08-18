@@ -85,9 +85,25 @@ class Setting extends Model
     }
     
     /**
+     * Check if guest email validation is enabled
+     */
+    public static function isGuestEmailValidationEnabled(): bool
+    {
+        return (bool) self::get('guest_email_validation_enabled', true);
+    }
+    
+    /**
+     * Get guest validation delay in minutes
+     */
+    public static function getGuestValidationDelayMinutes(): int
+    {
+        return (int) self::get('guest_validation_delay_minutes', 30);
+    }
+    
+    /**
      * Get charter text for a specific language
      */
-    public static function getCharter(string $locale = null): string
+    public static function getCharter(?string $locale = null): string
     {
         $locale = $locale ?: app()->getLocale();
         $key = "charter_text_{$locale}";
@@ -105,7 +121,7 @@ class Setting extends Model
     /**
      * Get charter text as HTML (parsed from Markdown)
      */
-    public static function getCharterHtml(string $locale = null): string
+    public static function getCharterHtml(?string $locale = null): string
     {
         $markdown = self::getCharter($locale);
         $markdownService = app(\App\Services\MarkdownService::class);

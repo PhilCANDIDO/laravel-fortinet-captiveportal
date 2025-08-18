@@ -64,6 +64,7 @@ class FortiGateService
         
         $endpoint = '/cmdb/user/local';
         
+        // Step 1: Create the user without groups
         $payload = [
             'name' => $userData['username'],
             'passwd' => $userData['password'],
@@ -72,19 +73,65 @@ class FortiGateService
             'two-factor' => 'disable',
             'email-to' => $userData['email'] ?? '',
         ];
-        
-        // Only add groups if configured
-        if (!empty($this->settings->user_group)) {
-            $payload['groups'] = [
-                ['name' => $this->settings->user_group]
-            ];
-        }
 
         if (isset($userData['expires_at'])) {
             $payload['expiry-date'] = $userData['expires_at'];
         }
 
-        return $this->request('POST', $endpoint, $payload);
+        $response = $this->request('POST', $endpoint, $payload);
+        
+        // Step 2: Add user to group if configured
+        if (!empty($this->settings->user_group)) {
+            try {
+                $this->addUserToGroup($userData['username'], $this->settings->user_group);
+            } catch (\Exception $e) {
+                Log::warning("User created but could not add to group: {$e->getMessage()}");
+            }
+        }
+
+        return $response;
+    }
+    
+    /**
+     * Add a user to a FortiGate group
+     */
+    public function addUserToGroup(string $username, string $groupName): array
+    {
+        if (!$this->isConfigured()) {
+            throw new FortiGateConnectionException('FortiGate service is not configured');
+        }
+        
+        // First, get the current group members
+        $groupEndpoint = "/cmdb/user/group/{$groupName}";
+        
+        try {
+            // Get existing group data
+            $groupData = $this->request('GET', $groupEndpoint);
+            $currentMembers = $groupData['results'][0]['member'] ?? [];
+            
+            // Add new user to members list
+            $currentMembers[] = ['name' => $username];
+            
+            // Update the group with new member list
+            $updatePayload = [
+                'member' => $currentMembers
+            ];
+            
+            return $this->request('PUT', $groupEndpoint, $updatePayload);
+            
+        } catch (\Exception $e) {
+            // If group doesn't exist, try to create it with the user
+            Log::warning("Could not get group {$groupName}, attempting to create: {$e->getMessage()}");
+            
+            $createPayload = [
+                'name' => $groupName,
+                'member' => [
+                    ['name' => $username]
+                ]
+            ];
+            
+            return $this->request('POST', '/cmdb/user/group', $createPayload);
+        }
     }
 
     /**
@@ -116,35 +163,66 @@ class FortiGateService
             $payload['expiry-date'] = $userData['expires_at'];
         }
 
-        return $this->request('PUT', $endpoint, $payload);
+        $response = $this->request('PUT', $endpoint, $payload);
+        
+        // Handle groups separately if provided
+        if (isset($userData['groups']) && !empty($userData['groups'])) {
+            // Add user to specified groups
+            foreach ($userData['groups'] as $group) {
+                if (isset($group['name'])) {
+                    try {
+                        $this->addUserToGroup($username, $group['name']);
+                    } catch (\Exception $e) {
+                        Log::warning("Could not add user to group {$group['name']}: {$e->getMessage()}");
+                    }
+                }
+            }
+        }
+
+        return $response;
     }
 
     /**
      * Remove user from group before deletion
      */
-    public function removeUserFromGroup(string $username): bool
+    public function removeUserFromGroup(string $username, string $groupName = null): bool
     {
         if (!$this->isConfigured()) {
             return false;
         }
         
+        // Use configured group if not specified
+        if (empty($groupName)) {
+            $groupName = $this->settings->user_group;
+        }
+        
         // If no group is configured, nothing to remove
-        if (empty($this->settings->user_group)) {
+        if (empty($groupName)) {
             return true;
         }
         
         try {
-            // Update user to remove from all groups
-            $endpoint = "/cmdb/user/local/{$username}";
-            $payload = [
-                'groups' => []  // Empty groups array removes from all groups
+            // Get current group members
+            $groupEndpoint = "/cmdb/user/group/{$groupName}";
+            $groupData = $this->request('GET', $groupEndpoint);
+            $currentMembers = $groupData['results'][0]['member'] ?? [];
+            
+            // Remove the user from the members list
+            $updatedMembers = array_filter($currentMembers, function($member) use ($username) {
+                return $member['name'] !== $username;
+            });
+            
+            // Update the group with the new member list
+            $updatePayload = [
+                'member' => array_values($updatedMembers) // Reset array keys
             ];
             
-            $this->request('PUT', $endpoint, $payload);
+            $this->request('PUT', $groupEndpoint, $updatePayload);
             return true;
+            
         } catch (Exception $e) {
             // Log the error but don't fail the deletion process
-            Log::warning("Failed to remove user from group before deletion: {$e->getMessage()}");
+            Log::warning("Failed to remove user from group {$groupName}: {$e->getMessage()}");
             return false;
         }
     }

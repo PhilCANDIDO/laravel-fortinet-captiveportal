@@ -53,7 +53,7 @@ class UserService
             ]);
             
             // Sync with FortiGate immediately for employees
-            if ($this->fortiGateService->settings->is_active) {
+            if ($this->fortiGateService->isConfigured()) {
                 dispatch(new SyncFortiGateUserJob($user->id));
             }
             
@@ -114,7 +114,7 @@ class UserService
             ]);
             
             // Sync with FortiGate
-            if ($this->fortiGateService->settings->is_active) {
+            if ($this->fortiGateService->isConfigured()) {
                 dispatch(new SyncFortiGateUserJob($user->id));
             }
             
@@ -151,11 +151,23 @@ class UserService
         DB::beginTransaction();
         
         try {
+            // Check for duplicate email
+            $existingUser = User::where('email', $data['email'])
+                ->where('user_type', User::TYPE_GUEST)
+                ->first();
+                
+            if ($existingUser) {
+                throw new \Exception('Email already registered');
+            }
+            
             // Generate secure password
             $password = $this->generateSecurePassword();
             
             // Guests expire after 24 hours
             $expiresAt = Carbon::now()->addDay();
+            
+            // Determine if email validation is enabled
+            $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
             
             $user = User::create([
                 'name' => trim($data['first_name'] . ' ' . $data['last_name']),
@@ -167,29 +179,24 @@ class UserService
                 'sponsor_email' => null,
                 'phone' => $data['phone'] ?? null,
                 'expires_at' => $expiresAt,
-                'is_active' => false, // Inactive until email validation
-                'status' => User::STATUS_PENDING,
+                'is_active' => !$emailValidationEnabled, // Active immediately if validation disabled
+                'status' => $emailValidationEnabled ? User::STATUS_PENDING : User::STATUS_ACTIVE,
                 'registration_ip' => request()->ip(),
             ]);
             
-            // Generate validation token (done automatically in model)
+            // Update FortiGate username with the actual ID
+            $user->fortigate_username = "guest-{$user->id}";
+            $user->save();
             
-            // Schedule deletion if not validated within 30 minutes
-            DeleteUnvalidatedGuestJob::dispatch($user->id)
-                ->delay(now()->addMinutes(30));
-            
-            // Store password temporarily (not in database)
-            $user->temp_password = $password;
-            
-            // Create FortiGate user immediately but disabled
+            // Create FortiGate user immediately (enabled if validation disabled)
             try {
                 if (app(FortiGateService::class)->isConfigured()) {
                     $userData = [
-                        'username' => $user->fortigate_username ?? $user->email,
+                        'username' => $user->fortigate_username,
                         'password' => $password,
                         'email' => $user->email,
                         'expires_at' => $user->expires_at ? $user->expires_at->format('Y-m-d H:i:s') : null,
-                        'status' => 'disable', // Create as disabled until validated
+                        'status' => $emailValidationEnabled ? 'disable' : 'enable',
                     ];
                     
                     app(FortiGateService::class)->createUser($userData);
@@ -200,6 +207,14 @@ class UserService
             } catch (\Exception $e) {
                 Log::warning('Could not create FortiGate user during registration: ' . $e->getMessage());
                 // Don't fail the registration if FortiGate sync fails
+            }
+            
+            // Only schedule validation job if email validation is enabled
+            if ($emailValidationEnabled) {
+                // Schedule disabling if not validated within configured delay
+                $delayMinutes = \App\Models\Setting::getGuestValidationDelayMinutes();
+                DeleteUnvalidatedGuestJob::dispatch($user->id)
+                    ->delay(now()->addMinutes($delayMinutes));
             }
             
             // Log the action
@@ -214,6 +229,9 @@ class UserService
             );
             
             DB::commit();
+            
+            // Add password to user object for email (not saved in DB)
+            $user->temp_password = $password;
             
             return $user;
             
@@ -412,7 +430,7 @@ class UserService
         
         try {
             // Remove from FortiGate first
-            if ($this->fortiGateService->settings->is_active) {
+            if ($this->fortiGateService->isConfigured()) {
                 $user->removeFromFortiGate();
             }
             
@@ -459,7 +477,7 @@ class UserService
             $user->markAsExpired();
             
             // Remove from FortiGate
-            if ($this->fortiGateService->settings->is_active) {
+            if ($this->fortiGateService->isConfigured()) {
                 $user->removeFromFortiGate();
             }
             
@@ -508,7 +526,7 @@ class UserService
      */
     public function syncPendingUsers(): int
     {
-        if (!$this->fortiGateService->settings->is_active) {
+        if (!$this->fortiGateService->isConfigured()) {
             return 0;
         }
         
@@ -533,7 +551,8 @@ class UserService
      */
     public function generateSecurePassword(int $length = null): string
     {
-        $length = $length ?? $this->fortiGateService->settings->default_password_length ?? 12;
+        $settings = \App\Models\FortiGateSettings::current();
+        $length = $length ?? $settings->default_password_length ?? 12;
         
         // Ensure ANSSI compliance (min 12 chars)
         $length = max(12, $length);
