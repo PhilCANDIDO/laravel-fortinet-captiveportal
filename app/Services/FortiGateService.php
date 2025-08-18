@@ -291,33 +291,26 @@ class FortiGateService
      */
     public function getActiveSessions(): array
     {
-        // Try different endpoints for getting user sessions
-        $endpoints = [
-            '/monitor/user/info',
-            '/monitor/firewall/auth-users',
-            '/monitor/user/firewall',
-        ];
-        
-        $cacheKey = $this->getCacheKey('sessions');
-        
-        foreach ($endpoints as $endpoint) {
-            try {
-                if ($this->config['cache']['enabled']) {
-                    return Cache::remember($cacheKey, $this->config['cache']['ttl'], function () use ($endpoint) {
-                        $response = $this->request('GET', $endpoint);
-                        return $response['results'] ?? [];
-                    });
-                }
-                
-                $response = $this->request('GET', $endpoint);
-                return $response['results'] ?? [];
-            } catch (Exception $e) {
-                Log::debug("Endpoint {$endpoint} failed: {$e->getMessage()}");
-                continue;
-            }
+        // Skip if circuit breaker is open
+        if ($this->isCircuitOpen()) {
+            return [];
         }
         
-        // If all endpoints fail, return empty array
+        // Try to get sessions without retries to avoid circuit breaker issues
+        try {
+            $url = $this->apiUrl . '/monitor/user/firewall';
+            $client = $this->getHttpClient();
+            $response = $client->get($url);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                return $data['results'] ?? [];
+            }
+        } catch (Exception $e) {
+            Log::debug("Could not get active sessions: " . $e->getMessage());
+        }
+        
+        // Return empty array if we can't get sessions
         return [];
     }
 
@@ -369,76 +362,43 @@ class FortiGateService
     
     /**
      * Deauthenticate user - terminates all active firewall sessions
-     * This is required before disabling or deleting a user to ensure they are disconnected
+     * This is optional and non-blocking - if it fails, we still proceed with disable/delete
      */
     public function deauthenticateUser(string $username): bool
     {
         if (!$this->isConfigured()) {
-            return false;
+            return true;  // Return true to not block operations
         }
         
-        // Try different deauth endpoints
-        $deauthEndpoints = [
-            '/monitor/user/deauth',
-            '/monitor/user/deauth-all',
-            '/api/v2/monitor/user/deauth',
-        ];
+        // Skip deauth if circuit breaker is open
+        if ($this->isCircuitOpen()) {
+            Log::debug("Skipping deauth for user {$username} - circuit breaker is open");
+            return true;
+        }
         
-        $deauthSuccess = false;
-        
-        // Try to deauthenticate directly without checking sessions first
-        foreach ($deauthEndpoints as $endpoint) {
-            try {
-                $payload = [
-                    'username' => $username,
-                    'all-fsso' => 'enable',  // Deauth from all FSSO sources
-                    'method' => 'firewall',  // Specify firewall auth method
-                ];
-                
-                $this->request('POST', $endpoint, $payload);
-                Log::info("Successfully deauthenticated user {$username} using endpoint {$endpoint}");
-                $deauthSuccess = true;
-                break;
-            } catch (Exception $e) {
-                Log::debug("Deauth endpoint {$endpoint} failed for user {$username}: {$e->getMessage()}");
+        // Try a simple deauth without retries for monitor endpoints
+        try {
+            // Use executeRequest directly to bypass retry logic for monitor endpoints
+            $url = $this->apiUrl . '/monitor/user/deauth';
+            $client = $this->getHttpClient();
+            
+            $payload = [
+                'username' => $username,
+                'method' => 'firewall',
+            ];
+            
+            $response = $client->post($url, $payload);
+            
+            if ($response->successful()) {
+                Log::info("Successfully deauthenticated user {$username}");
+                return true;
             }
+        } catch (Exception $e) {
+            // Log but don't fail the operation
+            Log::debug("Deauth not available for user {$username}: " . $e->getMessage());
         }
         
-        // If direct deauth didn't work, try getting sessions and deauth individually
-        if (!$deauthSuccess) {
-            try {
-                // Try to get sessions (this might fail but that's ok)
-                $sessions = $this->getUserSessions($username);
-                
-                if (!empty($sessions)) {
-                    foreach ($sessions as $session) {
-                        // Try multiple approaches to deauth the session
-                        $this->tryDeauthSession($username, $session);
-                    }
-                } else {
-                    Log::info("No active sessions found for user: {$username}");
-                }
-            } catch (Exception $e) {
-                // If we can't get sessions, try a blind deauth anyway
-                Log::debug("Could not get sessions for user {$username}, attempting blind deauth: {$e->getMessage()}");
-                
-                // Try to deauth without session info
-                try {
-                    $payload = ['username' => $username];
-                    $this->request('POST', '/monitor/user/deauth', $payload);
-                    Log::info("Blind deauth attempted for user: {$username}");
-                } catch (Exception $blindE) {
-                    Log::debug("Blind deauth also failed: {$blindE->getMessage()}");
-                }
-            }
-        }
-        
-        // Clear session cache
-        if ($this->config['cache']['enabled']) {
-            Cache::forget($this->getCacheKey('sessions'));
-        }
-        
-        // Return true even if deauth failed - we still want to proceed with disable/delete
+        // Always return true to not block disable/delete operations
         return true;
     }
     
