@@ -420,7 +420,13 @@ class FortiGateService
      */
     public function enableUser(string $username): bool
     {
-        return $this->updateUser($username, ['status' => 'enable']);
+        try {
+            $this->updateUser($username, ['status' => 'enable']);
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to enable user {$username}: {$e->getMessage()}");
+            return false;
+        }
     }
 
     /**
@@ -428,11 +434,17 @@ class FortiGateService
      */
     public function disableUser(string $username): bool
     {
-        // First deauthenticate any active sessions for this user
-        $this->deauthenticateUser($username);
-        
-        // Then disable the account
-        return $this->updateUser($username, ['status' => 'disable']);
+        try {
+            // First deauthenticate any active sessions for this user
+            $this->deauthenticateUser($username);
+            
+            // Then disable the account
+            $this->updateUser($username, ['status' => 'disable']);
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to disable user {$username}: {$e->getMessage()}");
+            return false;
+        }
     }
 
     /**
