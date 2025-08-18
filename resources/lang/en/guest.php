@@ -86,8 +86,9 @@ return [
     'auto_authentication_title' => 'Automatic Connection',
     'auto_authentication_message' => 'You will be automatically redirected to connect to the network.',
     'auto_authentication_ready' => 'Your account is ready. Click the button below to connect to the network.',
+    'auto_redirect_message' => 'Auto-redirect in',
     'seconds' => 'seconds',
-    'cancel_redirect' => 'Cancel',
+    'cancel_redirect' => 'Cancel redirect',
     'connect_now' => 'Connect Now',
     
     // Account status

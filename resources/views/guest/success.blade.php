@@ -31,17 +31,29 @@
                         </svg>
                         {{ __('guest.auto_authentication_title') }}
                     </h3>
-                    <p class="text-green-700 mb-4">
+                    <p class="text-green-700 mb-2">
                         {{ __('guest.auto_authentication_ready') }}
+                    </p>
+                    <p class="text-green-600 text-sm mb-4">
+                        {{ __('guest.auto_redirect_message') }} <span id="countdown" class="font-bold">10</span> {{ __('guest.seconds') }}...
                     </p>
                     <div class="flex justify-center">
                         <a href="{{ $autoAuthUrl }}" 
+                           id="connectButton"
+                           target="_blank"
                            class="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
                             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                             </svg>
                             {{ __('guest.connect_now') }}
                         </a>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <button type="button" 
+                                id="cancelCountdown"
+                                class="text-sm text-green-600 hover:text-green-800 underline">
+                            {{ __('guest.cancel_redirect') }}
+                        </button>
                     </div>
                     @if(isset($portalInfo) && $portalInfo)
                     <div class="mt-4 pt-3 border-t border-green-200">
@@ -209,5 +221,66 @@ function copyToClipboard(elementId) {
         document.body.removeChild(textArea);
     }
 }
+
+// Auto-redirect countdown (only if auto auth URL exists)
+@if(isset($autoAuthUrl) && $autoAuthUrl)
+(function() {
+    let countdown = 10;
+    let countdownInterval = null;
+    const countdownElement = document.getElementById('countdown');
+    const connectButton = document.getElementById('connectButton');
+    const cancelButton = document.getElementById('cancelCountdown');
+    
+    function startCountdown() {
+        countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdownElement) {
+                countdownElement.textContent = countdown;
+            }
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                // Open in new tab
+                window.open(connectButton.href, '_blank');
+                // Reset countdown display
+                if (countdownElement) {
+                    countdownElement.textContent = '✓';
+                }
+            }
+        }, 1000);
+    }
+    
+    function stopCountdown() {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+        // Hide the countdown message
+        const countdownContainer = countdownElement?.parentElement;
+        if (countdownContainer) {
+            countdownContainer.style.display = 'none';
+        }
+        // Hide the cancel button
+        if (cancelButton) {
+            cancelButton.style.display = 'none';
+        }
+    }
+    
+    // Start countdown on page load
+    startCountdown();
+    
+    // Cancel countdown if user clicks cancel
+    if (cancelButton) {
+        cancelButton.addEventListener('click', stopCountdown);
+    }
+    
+    // Cancel countdown if user manually clicks the connect button
+    if (connectButton) {
+        connectButton.addEventListener('click', () => {
+            stopCountdown();
+        });
+    }
+})();
+@endif
 </script>
 @endsection
