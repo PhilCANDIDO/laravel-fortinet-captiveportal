@@ -19,6 +19,8 @@ class GuestManagement extends Component
     public $perPage = 10;
     public $showDeleteModal = false;
     public $userToDelete = null;
+    public $showDetailModal = false;
+    public $userDetail = null;
     
     protected $queryString = [
         'search' => ['except' => ''],
@@ -123,6 +125,78 @@ class GuestManagement extends Component
             $errorMessage = config('app.debug') 
                 ? 'Erreur: ' . $e->getMessage() 
                 : 'Erreur lors de la suppression de l\'invité';
+            
+            $this->dispatch('notify', ['type' => 'error', 'message' => $errorMessage]);
+        }
+    }
+    
+    public function showUserDetail($userId)
+    {
+        $this->userDetail = User::find($userId);
+        $this->showDetailModal = true;
+    }
+    
+    public function toggleUserStatus($userId)
+    {
+        try {
+            DB::beginTransaction();
+            
+            $user = User::find($userId);
+            
+            if (!$user) {
+                $this->dispatch('notify', ['type' => 'error', 'message' => 'Utilisateur non trouvé']);
+                return;
+            }
+            
+            // Toggle status
+            $newStatus = $user->status === 'active' ? 'disabled' : 'active';
+            $user->status = $newStatus;
+            $user->save();
+            
+            // Update in FortiGate
+            try {
+                $fortiGateService = app(FortiGateService::class);
+                $fortiGateService->updateUser($user->fortigate_username ?? $user->email, [
+                    'status' => $newStatus === 'active' ? 'enable' : 'disable'
+                ]);
+            } catch (\Exception $fortiGateException) {
+                // Log the FortiGate error but continue
+                Log::warning('Could not update user status in FortiGate: ' . $fortiGateException->getMessage());
+            }
+            
+            // Log the action
+            AuditLog::create([
+                'admin_user_id' => auth('admin')->id(),
+                'action' => $newStatus === 'active' ? 'enable_guest' : 'disable_guest',
+                'model_type' => 'User',
+                'model_id' => $user->id,
+                'details' => [
+                    'email' => $user->email,
+                    'name' => $user->name,
+                    'new_status' => $newStatus
+                ],
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'event_type' => 'user_management',
+                'event_category' => 'status_change',
+                'status' => 'success'
+            ]);
+            
+            DB::commit();
+            
+            $message = $newStatus === 'active' ? 'Invité activé avec succès' : 'Invité désactivé avec succès';
+            $this->dispatch('notify', ['type' => 'success', 'message' => $message]);
+            $this->dispatch('refreshList');
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to toggle guest user status: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            $errorMessage = config('app.debug') 
+                ? 'Erreur: ' . $e->getMessage() 
+                : 'Erreur lors de la modification du statut de l\'invité';
             
             $this->dispatch('notify', ['type' => 'error', 'message' => $errorMessage]);
         }
