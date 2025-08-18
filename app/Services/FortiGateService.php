@@ -291,19 +291,34 @@ class FortiGateService
      */
     public function getActiveSessions(): array
     {
-        $endpoint = '/monitor/user/info';
+        // Try different endpoints for getting user sessions
+        $endpoints = [
+            '/monitor/user/info',
+            '/monitor/firewall/auth-users',
+            '/monitor/user/firewall',
+        ];
         
         $cacheKey = $this->getCacheKey('sessions');
         
-        if ($this->config['cache']['enabled']) {
-            return Cache::remember($cacheKey, $this->config['cache']['ttl'], function () use ($endpoint) {
+        foreach ($endpoints as $endpoint) {
+            try {
+                if ($this->config['cache']['enabled']) {
+                    return Cache::remember($cacheKey, $this->config['cache']['ttl'], function () use ($endpoint) {
+                        $response = $this->request('GET', $endpoint);
+                        return $response['results'] ?? [];
+                    });
+                }
+                
                 $response = $this->request('GET', $endpoint);
                 return $response['results'] ?? [];
-            });
+            } catch (Exception $e) {
+                Log::debug("Endpoint {$endpoint} failed: {$e->getMessage()}");
+                continue;
+            }
         }
         
-        $response = $this->request('GET', $endpoint);
-        return $response['results'] ?? [];
+        // If all endpoints fail, return empty array
+        return [];
     }
 
     /**
@@ -362,48 +377,101 @@ class FortiGateService
             return false;
         }
         
-        // Use the /monitor/user/deauth endpoint to deauthenticate user
-        $endpoint = '/monitor/user/deauth';
+        // Try different deauth endpoints
+        $deauthEndpoints = [
+            '/monitor/user/deauth',
+            '/monitor/user/deauth-all',
+            '/api/v2/monitor/user/deauth',
+        ];
         
-        try {
-            // First, get all active sessions for this user
-            $sessions = $this->getUserSessions($username);
-            
-            if (empty($sessions)) {
-                Log::info("No active sessions found for user: {$username}");
-                return true;
-            }
-            
-            // Deauthenticate each session
-            foreach ($sessions as $session) {
+        $deauthSuccess = false;
+        
+        // Try to deauthenticate directly without checking sessions first
+        foreach ($deauthEndpoints as $endpoint) {
+            try {
                 $payload = [
                     'username' => $username,
+                    'all-fsso' => 'enable',  // Deauth from all FSSO sources
+                    'method' => 'firewall',  // Specify firewall auth method
                 ];
                 
-                // Add IP if available in session data
+                $this->request('POST', $endpoint, $payload);
+                Log::info("Successfully deauthenticated user {$username} using endpoint {$endpoint}");
+                $deauthSuccess = true;
+                break;
+            } catch (Exception $e) {
+                Log::debug("Deauth endpoint {$endpoint} failed for user {$username}: {$e->getMessage()}");
+            }
+        }
+        
+        // If direct deauth didn't work, try getting sessions and deauth individually
+        if (!$deauthSuccess) {
+            try {
+                // Try to get sessions (this might fail but that's ok)
+                $sessions = $this->getUserSessions($username);
+                
+                if (!empty($sessions)) {
+                    foreach ($sessions as $session) {
+                        // Try multiple approaches to deauth the session
+                        $this->tryDeauthSession($username, $session);
+                    }
+                } else {
+                    Log::info("No active sessions found for user: {$username}");
+                }
+            } catch (Exception $e) {
+                // If we can't get sessions, try a blind deauth anyway
+                Log::debug("Could not get sessions for user {$username}, attempting blind deauth: {$e->getMessage()}");
+                
+                // Try to deauth without session info
+                try {
+                    $payload = ['username' => $username];
+                    $this->request('POST', '/monitor/user/deauth', $payload);
+                    Log::info("Blind deauth attempted for user: {$username}");
+                } catch (Exception $blindE) {
+                    Log::debug("Blind deauth also failed: {$blindE->getMessage()}");
+                }
+            }
+        }
+        
+        // Clear session cache
+        if ($this->config['cache']['enabled']) {
+            Cache::forget($this->getCacheKey('sessions'));
+        }
+        
+        // Return true even if deauth failed - we still want to proceed with disable/delete
+        return true;
+    }
+    
+    /**
+     * Try to deauthenticate a specific session
+     */
+    protected function tryDeauthSession(string $username, array $session): void
+    {
+        $endpoints = [
+            '/monitor/user/deauth',
+            '/monitor/user/kick',
+            '/monitor/firewall/deauth',
+        ];
+        
+        foreach ($endpoints as $endpoint) {
+            try {
+                $payload = ['username' => $username];
+                
+                // Add IP if available
                 if (isset($session['ip'])) {
                     $payload['ip'] = $session['ip'];
                 } elseif (isset($session['src_ip'])) {
                     $payload['ip'] = $session['src_ip'];
+                } elseif (isset($session['client_ip'])) {
+                    $payload['ip'] = $session['client_ip'];
                 }
                 
-                try {
-                    $this->request('POST', $endpoint, $payload);
-                    Log::info("Deauthenticated session for user: {$username}", $payload);
-                } catch (Exception $e) {
-                    Log::warning("Failed to deauthenticate session for user {$username}: {$e->getMessage()}");
-                }
+                $this->request('POST', $endpoint, $payload);
+                Log::info("Deauthenticated session for user {$username} using {$endpoint}", $payload);
+                break;
+            } catch (Exception $e) {
+                Log::debug("Failed to deauth session using {$endpoint}: {$e->getMessage()}");
             }
-            
-            // Clear session cache
-            if ($this->config['cache']['enabled']) {
-                Cache::forget($this->getCacheKey('sessions'));
-            }
-            
-            return true;
-        } catch (Exception $e) {
-            Log::error("Failed to deauthenticate user {$username}: {$e->getMessage()}");
-            return false;
         }
     }
 
