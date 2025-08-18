@@ -1,7 +1,7 @@
 @extends('layouts.guest')
 
 @section('content')
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" @if(isset($autoAuthUrl) && $autoAuthUrl) x-data="{ autoRedirect: true, countdown: 5 }" x-init="if(autoRedirect) { let timer = setInterval(() => { countdown--; if(countdown <= 0) { clearInterval(timer); window.location.href = '{{ $autoAuthUrl }}'; } }, 1000); }" @endif>
     <div class="max-w-2xl w-full">
         <div class="bg-white shadow-xl rounded-lg overflow-hidden">
             <!-- Success Header -->
@@ -22,6 +22,47 @@
             </div>
             
             <div class="px-8 py-8">
+                @if(isset($autoAuthUrl) && $autoAuthUrl)
+                <!-- Auto-Authentication Notice -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-900 mb-2 flex items-center">
+                        <svg class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        {{ __('guest.auto_authentication_title') }}
+                    </h3>
+                    <p class="text-green-700 mb-3">
+                        {{ __('guest.auto_authentication_message') }}
+                    </p>
+                    <div class="flex items-center justify-between">
+                        <div class="text-2xl font-bold text-green-800">
+                            <span x-text="countdown"></span> {{ __('guest.seconds') }}
+                        </div>
+                        <div class="space-x-2">
+                            <button @click="autoRedirect = false; clearInterval(timer)" 
+                                    x-show="autoRedirect"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
+                                {{ __('guest.cancel_redirect') }}
+                            </button>
+                            <a href="{{ $autoAuthUrl }}" 
+                               class="inline-block px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm">
+                                {{ __('guest.connect_now') }}
+                            </a>
+                        </div>
+                    </div>
+                    @if(isset($portalInfo) && $portalInfo)
+                    <div class="mt-3 pt-3 border-t border-green-200">
+                        <p class="text-sm text-green-700">
+                            <strong>{{ __('guest.network') }}:</strong> {{ $portalInfo['ssid'] }}
+                            @if($portalInfo['client_ip'] !== 'N/A')
+                                | <strong>IP:</strong> {{ $portalInfo['client_ip'] }}
+                            @endif
+                        </p>
+                    </div>
+                    @endif
+                </div>
+                @endif
+                
                 <!-- Account Credentials -->
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-semibold text-blue-900 mb-4 flex items-center">
@@ -99,14 +140,16 @@
                 
                 <!-- Action Buttons -->
                 <div class="flex flex-col sm:flex-row gap-4">
-                    @if($captivePortalUrl)
-                    <a href="{{ $captivePortalUrl }}" target="_blank"
-                       class="flex-1 text-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 inline-flex items-center justify-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                        </svg>
-                        {{ __('guest.open_captive_portal') }}
-                    </a>
+                    @if(!isset($autoAuthUrl) || !$autoAuthUrl)
+                        @if($captivePortalUrl)
+                        <a href="{{ $captivePortalUrl }}" target="_blank"
+                           class="flex-1 text-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 inline-flex items-center justify-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            {{ __('guest.open_captive_portal') }}
+                        </a>
+                        @endif
                     @endif
                     
                     <a href="{{ route('guest.register') }}"

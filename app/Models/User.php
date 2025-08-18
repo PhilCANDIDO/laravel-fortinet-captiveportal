@@ -65,6 +65,11 @@ class User extends Authenticatable
         'status',
         'status_reason',
         'admin_notes',
+        'portal_data',
+        'network_ssid',
+        'visit_reason',
+        'first_name',
+        'last_name',
     ];
 
     /**
