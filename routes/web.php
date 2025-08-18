@@ -19,3 +19,6 @@ require __DIR__.'/admin.php';
 
 // Include guest routes
 require __DIR__.'/guest.php';
+
+// Landing page for FortiGate post-authentication redirect
+Route::get('/landing', [App\Http\Controllers\LandingController::class, 'index'])->name('landing');
