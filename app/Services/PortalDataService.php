@@ -37,8 +37,24 @@ class PortalDataService
                 return null;
             }
 
+            // Log raw portal data if in debug mode
+            if (config('app.debug') && config('logging.default') && config('logging.channels.' . config('logging.default') . '.level') === 'debug') {
+                Log::debug('Portal data: Raw decoded data', [
+                    'raw_data' => $data,
+                    'json_pretty' => json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                ]);
+            }
+
             // Normalize the data before validation
             $data = $this->normalizePortalData($data);
+
+            // Log normalized portal data if in debug mode
+            if (config('app.debug') && config('logging.default') && config('logging.channels.' . config('logging.default') . '.level') === 'debug') {
+                Log::debug('Portal data: Normalized data', [
+                    'normalized_data' => $data,
+                    'json_pretty' => json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                ]);
+            }
 
             // Validate required fields
             if (!$this->validatePortalData($data)) {
@@ -251,6 +267,15 @@ class PortalDataService
         $path = $urlParts['path'] ?? '/';
         
         $finalUrl = $scheme . '://' . $host . $port . $path . '?' . http_build_query($queryParams);
+        
+        // Log generated auth URL if in debug mode
+        if (config('logging.channels.' . config('logging.default') . '.level') === 'debug') {
+            Log::debug('Portal data: Generated auth URL', [
+                'auth_url' => $finalUrl,
+                'username' => $username,
+                'query_params' => $queryParams
+            ]);
+        }
         
         return $finalUrl;
     }

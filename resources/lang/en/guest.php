@@ -83,6 +83,7 @@ return [
     // Auto-authentication
     'auto_authentication_title' => 'Automatic Connection',
     'auto_authentication_message' => 'You will be automatically redirected to connect to the network.',
+    'auto_authentication_ready' => 'Your account is ready. Click the button below to connect to the network.',
     'seconds' => 'seconds',
     'cancel_redirect' => 'Cancel',
     'connect_now' => 'Connect Now',

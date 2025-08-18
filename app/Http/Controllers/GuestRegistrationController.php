@@ -49,6 +49,15 @@ class GuestRegistrationController extends Controller
         
         if ($request->has('portal_data')) {
             $encodedData = $request->query('portal_data');
+            
+            // Log encoded data if in debug mode
+            if (config('logging.channels.' . config('logging.default') . '.level') === 'debug') {
+                Log::debug('Portal data: Received encoded data', [
+                    'encoded_data' => $encodedData,
+                    'length' => strlen($encodedData)
+                ]);
+            }
+            
             $portalData = $this->portalDataService->decodePortalData($encodedData);
             
             if ($portalData) {
