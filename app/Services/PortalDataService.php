@@ -82,10 +82,19 @@ class PortalDataService
         // Convert auth_post_url to auth_url
         if (isset($data['auth_post_url']) && !isset($data['auth_url'])) {
             if (isset($data['portal_url'])) {
-                $parsedUrl = parse_url($data['portal_url']);
-                $data['auth_url'] = $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . 
-                    (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '') . 
-                    $data['auth_post_url'];
+                // For FortiGate, we need to use the portal_url as the base for auth
+                // The portal_url format is: http://192.168.20.1:1000/fgtauth?MAGIC
+                // We should post back to the same URL with the magic token preserved
+                $data['auth_url'] = $data['portal_url'];
+            }
+        }
+        
+        // Extract magic from portal_url if not provided separately
+        if (!isset($data['magic']) && isset($data['portal_url'])) {
+            $parsedUrl = parse_url($data['portal_url']);
+            if (isset($parsedUrl['query'])) {
+                // The magic token is often the query parameter itself
+                $data['magic'] = $parsedUrl['query'];
             }
         }
         
@@ -219,8 +228,17 @@ class PortalDataService
         $urlParts = parse_url($authUrl);
         $queryParams = [];
         
-        if (isset($urlParts['query'])) {
-            parse_str($urlParts['query'], $queryParams);
+        // Check if the URL already has a magic token in the query string (FortiGate format)
+        // Format: http://192.168.20.1:1000/fgtauth?MAGIC_TOKEN
+        if (isset($urlParts['query']) && !empty($urlParts['query'])) {
+            // If query string doesn't contain '=', it's likely the magic token itself
+            if (strpos($urlParts['query'], '=') === false) {
+                // This is the magic token, preserve it as the first parameter
+                $magicToken = $urlParts['query'];
+                $queryParams[$magicToken] = '';  // Magic token is the key with no value
+            } else {
+                parse_str($urlParts['query'], $queryParams);
+            }
         }
 
         // Add or override authentication parameters
@@ -234,10 +252,13 @@ class PortalDataService
         $passwordField = $formFields['password_field'] ?? 'password';
         $queryParams[$passwordField] = $password;
         
-        // Magic token if present
-        if (!empty($portalData['magic'])) {
+        // Magic token if present and not already in URL
+        if (!empty($portalData['magic']) && !isset($queryParams[$portalData['magic']])) {
             $magicField = $formFields['magic_field'] ?? 'magic';
-            $queryParams[$magicField] = $portalData['magic'];
+            // If magic field is 'magic', add it as a parameter
+            if ($magicField === 'magic') {
+                $queryParams[$magicField] = $portalData['magic'];
+            }
         }
         
         // Redirect URL if present
@@ -266,7 +287,25 @@ class PortalDataService
         $port = isset($urlParts['port']) ? ':' . $urlParts['port'] : '';
         $path = $urlParts['path'] ?? '/';
         
-        $finalUrl = $scheme . '://' . $host . $port . $path . '?' . http_build_query($queryParams);
+        // Build query string manually to preserve FortiGate format
+        $queryString = '';
+        $first = true;
+        foreach ($queryParams as $key => $value) {
+            if ($first) {
+                $queryString .= $key;
+                if ($value !== '') {
+                    $queryString .= '=' . urlencode($value);
+                }
+                $first = false;
+            } else {
+                $queryString .= '&' . $key;
+                if ($value !== '') {
+                    $queryString .= '=' . urlencode($value);
+                }
+            }
+        }
+        
+        $finalUrl = $scheme . '://' . $host . $port . $path . '?' . $queryString;
         
         // Log generated auth URL if in debug mode
         if (config('logging.channels.' . config('logging.default') . '.level') === 'debug') {

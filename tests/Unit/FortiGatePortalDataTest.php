@@ -37,8 +37,8 @@ class FortiGatePortalDataTest extends TestCase
         
         $this->assertNotNull($decoded);
         $this->assertEquals($portalData['portal_url'], $decoded['portal_url']);
-        // The auth_url should be built from portal_url and auth_post_url
-        $this->assertEquals('http://192.168.20.1:1000/', $decoded['auth_url']);
+        // The auth_url should now be the same as portal_url for FortiGate
+        $this->assertEquals('http://192.168.20.1:1000/fgtauth?050d0496b5579426', $decoded['auth_url']);
         $this->assertEquals('050d0496b5579426', $decoded['magic']);
         $this->assertEquals('http://google.fr/', $decoded['redirect_url']);
         
@@ -53,7 +53,7 @@ class FortiGatePortalDataTest extends TestCase
     public function test_generate_auth_url_with_fortigate_format()
     {
         $portalData = [
-            'auth_url' => 'http://192.168.20.1:1000/',
+            'auth_url' => 'http://192.168.20.1:1000/fgtauth?050d0496b5579426',
             'magic' => '050d0496b5579426',
             'redirect_url' => 'http://google.fr/',
             'form_fields' => [
@@ -66,10 +66,9 @@ class FortiGatePortalDataTest extends TestCase
 
         $url = $this->service->generateAuthUrl($portalData, 'guest-10', 'TestPass123!');
         
-        $this->assertStringContainsString('http://192.168.20.1:1000/', $url);
+        $this->assertStringContainsString('http://192.168.20.1:1000/fgtauth?050d0496b5579426', $url);
         $this->assertStringContainsString('username=guest-10', $url);
         $this->assertStringContainsString('password=TestPass123', $url);
-        $this->assertStringContainsString('magic=050d0496b5579426', $url);
         $this->assertStringContainsString('4Tredir=' . urlencode('http://google.fr/'), $url);
     }
 
