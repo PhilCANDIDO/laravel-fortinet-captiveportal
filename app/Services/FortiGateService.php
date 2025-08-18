@@ -384,7 +384,7 @@ class FortiGateService
     
     /**
      * Deauthenticate user - terminates all active firewall sessions
-     * Uses CLI command via SSH API endpoint since direct deauth API is not available
+     * Note: This attempts to use CLI commands but may not be available in all configurations
      */
     public function deauthenticateUser(string $username): bool
     {
@@ -392,22 +392,28 @@ class FortiGateService
             return true;
         }
         
-        // Try to execute CLI command to deauthenticate user
+        // Only try if not in circuit breaker state
+        if ($this->isCircuitOpen()) {
+            Log::debug("Skipping deauth attempt - circuit breaker is open");
+            return true;
+        }
+        
+        // Try to execute CLI command to deauthenticate user (may not be available)
         try {
-            // The CLI command to deauthenticate a firewall user
             $cliCommand = "diagnose firewall auth clear user {$username}";
-            
             $result = $this->executeCliCommand($cliCommand);
             
             if ($result !== false) {
                 Log::info("Successfully deauthenticated user {$username} via CLI command");
                 return true;
+            } else {
+                Log::debug("CLI deauth not available for user {$username} - sessions will expire naturally");
             }
         } catch (Exception $e) {
-            Log::debug("Could not deauthenticate user {$username} via CLI: " . $e->getMessage());
+            Log::debug("Deauth attempt failed for {$username}: " . $e->getMessage());
         }
         
-        // Always return true to not block disable/delete operations
+        // Always return true - deauth is best-effort, not required
         return true;
     }
     
@@ -423,50 +429,49 @@ class FortiGateService
             return false;
         }
         
-        // Try different SSH/CLI endpoints
-        $endpoints = [
-            '/monitor/system/api/ssh',
-            '/api/v2/monitor/system/ssh',
-            '/monitor/system/console',
+        // Try different CLI/SSH endpoints - some require different methods
+        $attempts = [
+            // Standard monitor endpoints
+            ['method' => 'POST', 'endpoint' => '/monitor/system/console', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/monitor/cli/execute', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/monitor/web-ui/script', 'payload' => ['script' => $command]],
+            
+            // Try with different API versions
+            ['method' => 'POST', 'endpoint' => '/api/v2/monitor/system/cli', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/api/v2/cmdb/system/console', 'payload' => ['command' => $command]],
+            
+            // Try GET with command in query
+            ['method' => 'GET', 'endpoint' => '/monitor/system/cli', 'query' => ['command' => $command]],
         ];
         
-        foreach ($endpoints as $endpoint) {
+        foreach ($attempts as $attempt) {
             try {
-                $url = $this->apiUrl . $endpoint;
+                $url = $this->apiUrl . $attempt['endpoint'];
                 $client = $this->getHttpClient();
                 
-                // Different payload formats for different endpoints
-                $payloads = [
-                    ['command' => $command],
-                    ['cmd' => $command],
-                    ['commands' => [$command]],
-                ];
+                if ($attempt['method'] === 'POST') {
+                    $response = $client->post($url, $attempt['payload'] ?? []);
+                } else {
+                    $response = $client->get($url, $attempt['query'] ?? []);
+                }
                 
-                foreach ($payloads as $payload) {
-                    try {
-                        $response = $client->post($url, $payload);
-                        
-                        if ($response->successful()) {
-                            $data = $response->json();
-                            
-                            // Extract output from response (format may vary)
-                            $output = $data['results'] ?? $data['output'] ?? $data['response'] ?? '';
-                            
-                            Log::debug("CLI command executed successfully", [
-                                'command' => $command,
-                                'endpoint' => $endpoint,
-                                'output' => $output
-                            ]);
-                            
-                            return is_array($output) ? implode("\n", $output) : (string)$output;
-                        }
-                    } catch (Exception $e) {
-                        Log::debug("CLI endpoint {$endpoint} with payload format failed: " . $e->getMessage());
-                        continue;
-                    }
+                if ($response->successful()) {
+                    $data = $response->json();
+                    
+                    // Extract output from response (format may vary)
+                    $output = $data['results'] ?? $data['output'] ?? $data['response'] ?? $data['data'] ?? '';
+                    
+                    Log::info("CLI command executed successfully", [
+                        'command' => $command,
+                        'endpoint' => $attempt['endpoint'],
+                        'output' => substr((string)$output, 0, 200) // Log first 200 chars
+                    ]);
+                    
+                    return is_array($output) ? implode("\n", $output) : (string)$output;
                 }
             } catch (Exception $e) {
-                Log::debug("CLI endpoint {$endpoint} not available: " . $e->getMessage());
+                // Only log at debug level to avoid spam
+                Log::debug("CLI endpoint {$attempt['endpoint']} failed: " . substr($e->getMessage(), 0, 100));
                 continue;
             }
         }
