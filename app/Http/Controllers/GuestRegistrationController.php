@@ -96,8 +96,12 @@ class GuestRegistrationController extends Controller
             // Get the temporary password for the email
             $password = $user->temp_password;
             
-            // Send validation email
-            $this->notificationService->sendGuestValidationEmail($user, $password);
+            // Only send validation email if email validation is enabled
+            $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
+            if ($emailValidationEnabled) {
+                // Send validation email
+                $this->notificationService->sendGuestValidationEmail($user, $password);
+            }
             
             // Log the registration
             AuditLog::create([
@@ -129,8 +133,10 @@ class GuestRegistrationController extends Controller
             return redirect()->route('guest.register.success')
                 ->with('email', $user->email)
                 ->with('password', $password)
-                ->with('username', $user->fortigate_username ?? $user->email)
-                ->with('has_portal_data', $portalData !== null);
+                ->with('username', $user->fortigate_username)
+                ->with('has_portal_data', $portalData !== null)
+                ->with('email_validation_enabled', $emailValidationEnabled)
+                ->with('user_active', $user->is_active);
                 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -156,6 +162,8 @@ class GuestRegistrationController extends Controller
         $password = $request->session()->get('password');
         $username = $request->session()->get('username');
         $hasPortalData = $request->session()->get('has_portal_data', false);
+        $emailValidationEnabled = $request->session()->get('email_validation_enabled', true);
+        $userActive = $request->session()->get('user_active', false);
         
         if (!$email) {
             return redirect()->route('guest.register');
@@ -166,7 +174,10 @@ class GuestRegistrationController extends Controller
         $portalInfo = null;
         $portalData = $this->portalDataService->getFromSession();
         
-        if ($portalData && $hasPortalData) {
+        // Generate auto-auth URL if:
+        // 1. Portal data is available AND
+        // 2. Either email validation is disabled OR user is already active
+        if ($portalData && $hasPortalData && (!$emailValidationEnabled || $userActive)) {
             try {
                 // Generate authentication URL with credentials
                 $autoAuthUrl = $this->portalDataService->generateAuthUrl(
@@ -179,7 +190,8 @@ class GuestRegistrationController extends Controller
                 
                 Log::info('Auto-authentication URL generated for guest', [
                     'email' => $email,
-                    'ssid' => $portalInfo['ssid'] ?? 'unknown'
+                    'ssid' => $portalInfo['ssid'] ?? 'unknown',
+                    'email_validation_enabled' => $emailValidationEnabled
                 ]);
                 
                 // Clear portal data from session after use
@@ -211,7 +223,9 @@ class GuestRegistrationController extends Controller
             'username',
             'captivePortalUrl',
             'autoAuthUrl',
-            'portalInfo'
+            'portalInfo',
+            'emailValidationEnabled',
+            'userActive'
         ));
     }
     

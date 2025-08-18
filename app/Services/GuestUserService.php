@@ -33,6 +33,9 @@ class GuestUserService
         // Generate a secure password
         $password = $this->generateSecurePassword();
         
+        // Check if email validation is enabled
+        $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
+        
         // Create the user
         $user = new User();
         $user->name = $userData['first_name'] . ' ' . $userData['last_name'];
@@ -42,24 +45,38 @@ class GuestUserService
         $user->password = Hash::make($password);
         $user->temp_password = $password; // Store temporarily for email
         $user->user_type = User::TYPE_GUEST;
-        $user->status = User::STATUS_PENDING;
-        $user->is_active = false;
         
         // Optional fields
         $user->phone = $userData['phone'] ?? null;
         $user->company_name = $userData['company_name'] ?? null;
         $user->visit_reason = $userData['visit_reason'] ?? null;
         
-        // Set validation token and expiry (30 minutes)
-        $user->validation_token = Str::random(64);
-        $user->validation_expires_at = now()->addMinutes(30);
-        
-        // Set guest expiry (24 hours from validation)
+        // Set guest expiry (24 hours from now)
         $user->expires_at = now()->addHours(24);
         
-        // FortiGate username (use email prefix)
-        $emailPrefix = explode('@', $user->email)[0];
-        $user->fortigate_username = 'guest_' . $emailPrefix . '_' . Str::random(4);
+        // Set status based on email validation setting
+        if ($emailValidationEnabled) {
+            $user->status = User::STATUS_PENDING;
+            $user->is_active = false;
+            // Set validation token and expiry (30 minutes)
+            $user->validation_token = Str::random(64);
+            $user->validation_expires_at = now()->addMinutes(30);
+            $user->validated_at = null;
+        } else {
+            // If email validation is disabled, activate immediately
+            $user->status = User::STATUS_ACTIVE;
+            $user->is_active = true;
+            $user->validated_at = now();
+            // Don't set validation token when validation is disabled
+            $user->validation_token = null;
+            $user->validation_expires_at = null;
+        }
+        
+        // Save first to get the ID
+        $user->save();
+        
+        // Generate FortiGate username using the pattern guest-{{id}}
+        $user->fortigate_username = 'guest-' . $user->id;
         
         // Store portal data if provided
         if ($portalData) {
@@ -74,12 +91,14 @@ class GuestUserService
             }
         }
         
+        // Save the updated user with fortigate_username
         $user->save();
         
-        // Create user in FortiGate (but disabled until email validation)
+        // Create user in FortiGate
         try {
             if ($this->fortiGateService->isConfigured()) {
-                $this->createFortiGateUser($user, $password);
+                // If email validation is enabled, create as disabled; otherwise, create as enabled
+                $this->createFortiGateUser($user, $password, !$emailValidationEnabled);
             }
         } catch (\Exception $e) {
             Log::error('Failed to create user in FortiGate during registration', [
@@ -92,8 +111,10 @@ class GuestUserService
             $user->save();
         }
         
-        // Schedule deletion job if not validated within 30 minutes
-        DeleteUnvalidatedGuestJob::dispatch($user->id)->delay(now()->addMinutes(30));
+        // Only schedule deletion job if email validation is enabled
+        if ($emailValidationEnabled) {
+            DeleteUnvalidatedGuestJob::dispatch($user->id)->delay(now()->addMinutes(30));
+        }
         
         return $user;
     }
@@ -134,15 +155,16 @@ class GuestUserService
      *
      * @param User $user
      * @param string $password
+     * @param bool $enableImmediately
      * @return void
      */
-    protected function createFortiGateUser(User $user, string $password): void
+    protected function createFortiGateUser(User $user, string $password, bool $enableImmediately = false): void
     {
         $settings = \App\Models\FortiGateSettings::current();
         
         $userData = [
             'name' => $user->fortigate_username,
-            'status' => 'disable', // Disabled until email validation
+            'status' => $enableImmediately ? 'enable' : 'disable',
             'passwd' => $password,
             'email' => $user->email,
             'comments' => 'Guest user - ' . $user->name . ' (' . $user->company_name . ')',

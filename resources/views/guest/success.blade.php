@@ -115,6 +115,7 @@
                     </div>
                 </div>
                 
+                @if($emailValidationEnabled ?? true)
                 <!-- Validation Notice -->
                 <div class="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
                     <h3 class="text-lg font-semibold text-amber-900 mb-2">
@@ -124,7 +125,19 @@
                         {{ __('guest.validation_time_limit') }}
                     </p>
                 </div>
+                @else
+                <!-- Account Active Notice -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-900 mb-2">
+                        {{ __('guest.account_active') }}
+                    </h3>
+                    <p class="text-green-700">
+                        {{ __('guest.account_active_message') }}
+                    </p>
+                </div>
+                @endif
                 
+                @if($emailValidationEnabled ?? true)
                 <!-- Next Steps -->
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-4">
@@ -137,6 +150,7 @@
                         <li>{{ __('guest.step_connect') }}</li>
                     </ol>
                 </div>
+                @endif
                 
                 <!-- Action Buttons -->
                 <div class="flex flex-col sm:flex-row gap-4">
