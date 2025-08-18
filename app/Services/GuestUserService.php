@@ -163,9 +163,9 @@ class GuestUserService
         $settings = \App\Models\FortiGateSettings::current();
         
         $userData = [
-            'name' => $user->fortigate_username,
+            'username' => $user->fortigate_username,  // FortiGateService expects 'username' not 'name'
             'status' => $enableImmediately ? 'enable' : 'disable',
-            'passwd' => $password,
+            'password' => $password,  // FortiGateService expects 'password' not 'passwd'
             'email' => $user->email,
             'comments' => 'Guest user - ' . $user->name . ' (' . $user->company_name . ')',
         ];

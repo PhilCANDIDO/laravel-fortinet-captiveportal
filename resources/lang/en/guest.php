@@ -75,4 +75,19 @@ return [
     'accept_charter' => 'I Accept the Terms',
     'decline_charter' => 'Cancel',
     'processing' => 'Processing',
+    
+    // Network connection
+    'connected_network' => 'Connected to network',
+    'network' => 'Network',
+    
+    // Auto-authentication
+    'auto_authentication_title' => 'Automatic Connection',
+    'auto_authentication_message' => 'You will be automatically redirected to connect to the network.',
+    'seconds' => 'seconds',
+    'cancel_redirect' => 'Cancel',
+    'connect_now' => 'Connect Now',
+    
+    // Account status
+    'account_active' => 'Account Active',
+    'account_active_message' => 'Your account is active and ready to use. Use the credentials below to connect to the network.',
 ];

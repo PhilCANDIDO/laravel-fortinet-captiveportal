@@ -37,6 +37,9 @@ class PortalDataService
                 return null;
             }
 
+            // Normalize the data before validation
+            $data = $this->normalizePortalData($data);
+
             // Validate required fields
             if (!$this->validatePortalData($data)) {
                 return null;
@@ -53,6 +56,52 @@ class PortalDataService
     }
 
     /**
+     * Normalize portal data from FortiGate format to our standard format
+     *
+     * @param array $data Raw portal data
+     * @return array Normalized portal data
+     */
+    protected function normalizePortalData(array $data): array
+    {
+        // Convert auth_post_url to auth_url
+        if (isset($data['auth_post_url']) && !isset($data['auth_url'])) {
+            if (isset($data['portal_url'])) {
+                $parsedUrl = parse_url($data['portal_url']);
+                $data['auth_url'] = $parsedUrl['scheme'] . '://' . $parsedUrl['host'] . 
+                    (isset($parsedUrl['port']) ? ':' . $parsedUrl['port'] : '') . 
+                    $data['auth_post_url'];
+            }
+        }
+        
+        // Map FortiGate field names to our standard format
+        if (isset($data['magic_value']) && !isset($data['magic'])) {
+            $data['magic'] = $data['magic_value'];
+        }
+        if (isset($data['redir_value']) && !isset($data['redirect_url'])) {
+            $data['redirect_url'] = $data['redir_value'];
+        }
+        
+        // Build form_fields from individual field IDs
+        if (!isset($data['form_fields'])) {
+            $data['form_fields'] = [];
+            if (isset($data['username_id'])) {
+                $data['form_fields']['username_field'] = $data['username_id'];
+            }
+            if (isset($data['password_id'])) {
+                $data['form_fields']['password_field'] = $data['password_id'];
+            }
+            if (isset($data['magic_id'])) {
+                $data['form_fields']['magic_field'] = $data['magic_id'];
+            }
+            if (isset($data['redir_id'])) {
+                $data['form_fields']['redirect_field'] = $data['redir_id'];
+            }
+        }
+        
+        return $data;
+    }
+
+    /**
      * Validate portal data structure
      *
      * @param array $data Portal data to validate
@@ -61,14 +110,14 @@ class PortalDataService
     protected function validatePortalData(array $data): bool
     {
         $rules = [
-            'portal_url' => 'required|url',
-            'auth_url' => 'required|url',
+            'portal_url' => 'required|string',
+            'auth_url' => 'required|string',
             'magic' => 'nullable|string',
             'client_mac' => 'nullable|string',
             'client_ip' => 'nullable|string',
             'ap_mac' => 'nullable|string',
             'ssid' => 'nullable|string',
-            'redirect_url' => 'nullable|url',
+            'redirect_url' => 'nullable|string',
             'form_fields' => 'nullable|array',
             'form_fields.username_field' => 'nullable|string',
             'form_fields.password_field' => 'nullable|string',
@@ -177,7 +226,7 @@ class PortalDataService
         
         // Redirect URL if present
         if (!empty($portalData['redirect_url'])) {
-            $redirectField = $formFields['redirect_field'] ?? 'redirect';
+            $redirectField = $formFields['redirect_field'] ?? 'redir';  // FortiGate typically uses 'redir'
             $queryParams[$redirectField] = $portalData['redirect_url'];
         }
 

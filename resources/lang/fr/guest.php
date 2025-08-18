@@ -75,4 +75,19 @@ return [
     'accept_charter' => 'J\'accepte les conditions',
     'decline_charter' => 'Annuler',
     'processing' => 'Traitement',
+    
+    // Network connection
+    'connected_network' => 'Connecté au réseau',
+    'network' => 'Réseau',
+    
+    // Auto-authentication
+    'auto_authentication_title' => 'Connexion automatique',
+    'auto_authentication_message' => 'Vous allez être redirigé automatiquement pour vous connecter au réseau.',
+    'seconds' => 'secondes',
+    'cancel_redirect' => 'Annuler',
+    'connect_now' => 'Se connecter maintenant',
+    
+    // Account status
+    'account_active' => 'Compte actif',
+    'account_active_message' => 'Votre compte est actif et prêt à être utilisé. Utilisez les identifiants ci-dessous pour vous connecter au réseau.',
 ];
