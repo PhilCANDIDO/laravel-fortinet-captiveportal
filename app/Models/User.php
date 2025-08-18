@@ -128,9 +128,12 @@ class User extends Authenticatable
                 $user->setDefaultExpiration();
             }
             
-            // Generate validation token for guests
+            // Generate validation token for guests only if email validation is enabled
             if ($user->user_type === self::TYPE_GUEST && !$user->validation_token) {
-                $user->generateValidationToken();
+                // Check if email validation is enabled
+                if (\App\Models\Setting::isGuestEmailValidationEnabled()) {
+                    $user->generateValidationToken();
+                }
             }
         });
         

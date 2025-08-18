@@ -10,6 +10,25 @@ class GuestRegistrationWithPortalDataTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // Ensure FortiGate settings exist
+        \App\Models\FortiGateSettings::create([
+            'api_url' => 'https://192.168.1.1',
+            'api_token' => 'test-token',
+            'user_group' => 'guest-users',
+            'captive_portal_url' => 'https://192.168.1.1:1003/portal',
+        ]);
+        
+        // Enable email validation by default
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'guest_email_validation_enabled'],
+            ['value' => '1', 'type' => 'boolean', 'group' => 'security']
+        );
+    }
+
     protected function getValidPortalData(): array
     {
         return [
@@ -114,14 +133,22 @@ class GuestRegistrationWithPortalDataTest extends TestCase
 
     public function test_success_page_with_auto_authentication()
     {
+        // Disable email validation so auto-auth works immediately
+        \App\Models\Setting::updateOrCreate(
+            ['key' => 'guest_email_validation_enabled'],
+            ['value' => '0', 'type' => 'boolean', 'group' => 'security']
+        );
+        
         $portalData = $this->getValidPortalData();
         
         // Simulate session data from registration
         session([
             'email' => 'john.doe@example.com',
             'password' => 'SecurePass123!',
-            'username' => 'guest_john_abc123',
+            'username' => 'guest-123',  // Use the new username pattern
             'has_portal_data' => true,
+            'email_validation_enabled' => false,
+            'user_active' => true,
         ]);
         
         // Store portal data in session
@@ -136,8 +163,10 @@ class GuestRegistrationWithPortalDataTest extends TestCase
         
         // Check that auto-auth URL is generated correctly
         $viewData = $response->viewData('autoAuthUrl');
+        $this->assertNotNull($viewData);
         $this->assertStringContainsString('https://192.168.1.1:1003/authenticate', $viewData);
-        $this->assertStringContainsString('user=guest_john_abc123', $viewData);
+        // The test portal data specifies 'user' as the username field, not 'username'
+        $this->assertStringContainsString('user=guest-123', $viewData);
         $this->assertStringContainsString('pass=SecurePass123', urldecode($viewData));
     }
 
