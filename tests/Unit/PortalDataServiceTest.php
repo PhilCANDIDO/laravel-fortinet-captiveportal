@@ -111,9 +111,27 @@ class PortalDataServiceTest extends TestCase
 
         $info = $this->service->getPortalInfo($portalData);
         
+        $this->assertEquals('wireless', $info['network_type']);
+        $this->assertEquals('CompanyWiFi', $info['network_name']);
         $this->assertEquals('CompanyWiFi', $info['ssid']);
         $this->assertEquals('192.168.1.100', $info['client_ip']);
         $this->assertEquals('AA:BB:CC:DD:EE:FF', $info['ap_mac']);
+        $this->assertTrue($info['has_auto_auth']);
+    }
+    
+    public function test_portal_info_extraction_wired_network()
+    {
+        $portalData = [
+            'client_ip' => '192.168.1.100',
+            'auth_url' => 'https://192.168.1.1:1003/authenticate'
+        ];
+
+        $info = $this->service->getPortalInfo($portalData);
+        
+        $this->assertEquals('wired', $info['network_type']);
+        $this->assertEquals(__('guest.wired_network'), $info['network_name']); // Will be translated
+        $this->assertNull($info['ssid']);
+        $this->assertEquals('192.168.1.100', $info['client_ip']);
         $this->assertTrue($info['has_auto_auth']);
     }
 

@@ -82,7 +82,9 @@ class FortiGatePortalDataTest extends TestCase
 
         $info = $this->service->getPortalInfo($portalData);
         
-        $this->assertEquals('Unknown Network', $info['ssid']);
+        $this->assertEquals('wired', $info['network_type']);
+        $this->assertEquals(__('guest.wired_network'), $info['network_name']); // Will be translated
+        $this->assertNull($info['ssid']);
         $this->assertEquals('N/A', $info['client_ip']);
         $this->assertTrue($info['has_auto_auth']);
     }

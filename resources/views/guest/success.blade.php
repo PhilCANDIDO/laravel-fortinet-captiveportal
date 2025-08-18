@@ -45,10 +45,19 @@
                     </div>
                     @if(isset($portalInfo) && $portalInfo)
                     <div class="mt-4 pt-3 border-t border-green-200">
-                        <p class="text-sm text-green-700">
-                            <strong>{{ __('guest.network') }}:</strong> {{ $portalInfo['ssid'] }}
+                        <p class="text-sm text-green-700 flex items-center">
+                            @if($portalInfo['network_type'] === 'wireless')
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zM12.12 13.88a3 3 0 00-4.242 0 1 1 0 01-1.415-1.415 5 5 0 017.072 0 1 1 0 01-1.415 1.415zM9 16a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z"/>
+                                </svg>
+                            @else
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/><path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/><path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/>
+                                </svg>
+                            @endif
+                            <strong>{{ __('guest.network') }}:</strong>&nbsp;{{ $portalInfo['network_name'] }}
                             @if($portalInfo['client_ip'] !== 'N/A')
-                                | <strong>IP:</strong> {{ $portalInfo['client_ip'] }}
+                                &nbsp;| <strong>IP:</strong>&nbsp;{{ $portalInfo['client_ip'] }}
                             @endif
                         </p>
                     </div>

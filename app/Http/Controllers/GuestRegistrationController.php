@@ -66,7 +66,8 @@ class GuestRegistrationController extends Controller
                 $portalInfo = $this->portalDataService->getPortalInfo($portalData);
                 
                 Log::info('Guest registration form loaded with portal data', [
-                    'ssid' => $portalInfo['ssid'] ?? 'unknown',
+                    'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                    'network_name' => $portalInfo['network_name'] ?? 'unknown',
                     'client_ip' => $portalInfo['client_ip'] ?? 'unknown'
                 ]);
             } else {
@@ -199,7 +200,8 @@ class GuestRegistrationController extends Controller
                 
                 Log::info('Auto-authentication URL generated for guest', [
                     'email' => $email,
-                    'ssid' => $portalInfo['ssid'] ?? 'unknown',
+                    'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                    'network_name' => $portalInfo['network_name'] ?? 'unknown',
                     'email_validation_enabled' => $emailValidationEnabled
                 ]);
                 
@@ -339,7 +341,8 @@ class GuestRegistrationController extends Controller
                         Log::info('Guest email validated with portal data', [
                             'user_id' => $user->id,
                             'email' => $user->email,
-                            'ssid' => $portalInfo['ssid'] ?? 'unknown'
+                            'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                            'network_name' => $portalInfo['network_name'] ?? 'unknown'
                         ]);
                     }
                 } catch (\Exception $e) {

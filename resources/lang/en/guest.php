@@ -79,6 +79,8 @@ return [
     // Network connection
     'connected_network' => 'Connected to network',
     'network' => 'Network',
+    'wired_network' => 'Wired Network',
+    'wireless_network' => 'Wireless Network',
     
     // Auto-authentication
     'auto_authentication_title' => 'Automatic Connection',

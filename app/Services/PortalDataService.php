@@ -288,8 +288,19 @@ class PortalDataService
      */
     public function getPortalInfo(array $portalData): array
     {
+        // Determine network type based on presence of SSID
+        $networkType = 'wired'; // Default to wired
+        $networkName = __('guest.wired_network');
+        
+        if (!empty($portalData['ssid'])) {
+            $networkType = 'wireless';
+            $networkName = $portalData['ssid'];
+        }
+        
         return [
-            'ssid' => $portalData['ssid'] ?? 'Unknown Network',
+            'network_type' => $networkType,
+            'network_name' => $networkName,
+            'ssid' => $portalData['ssid'] ?? null,  // Keep original SSID if present
             'client_ip' => $portalData['client_ip'] ?? 'N/A',
             'ap_mac' => $portalData['ap_mac'] ?? 'N/A',
             'has_auto_auth' => !empty($portalData['auth_url']),
