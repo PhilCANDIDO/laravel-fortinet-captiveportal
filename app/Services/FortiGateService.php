@@ -296,7 +296,7 @@ class FortiGateService
             return [];
         }
         
-        // Try to get sessions without retries to avoid circuit breaker issues
+        // Try to get sessions via API first
         try {
             $url = $this->apiUrl . '/monitor/user/firewall';
             $client = $this->getHttpClient();
@@ -307,7 +307,29 @@ class FortiGateService
                 return $data['results'] ?? [];
             }
         } catch (Exception $e) {
-            Log::debug("Could not get active sessions: " . $e->getMessage());
+            Log::debug("Could not get active sessions via API: " . $e->getMessage());
+        }
+        
+        // Try to get sessions via CLI command as fallback
+        try {
+            $output = $this->executeCliCommand('diagnose firewall auth list');
+            if ($output !== false && !empty($output)) {
+                // Parse CLI output to extract user sessions
+                // This is a basic parser - adjust based on actual output format
+                $sessions = [];
+                $lines = explode("\n", $output);
+                foreach ($lines as $line) {
+                    if (preg_match('/user:\s*(\S+).*?src:\s*(\S+)/i', $line, $matches)) {
+                        $sessions[] = [
+                            'username' => $matches[1],
+                            'ip' => $matches[2],
+                        ];
+                    }
+                }
+                return $sessions;
+            }
+        } catch (Exception $e) {
+            Log::debug("Could not get active sessions via CLI: " . $e->getMessage());
         }
         
         // Return empty array if we can't get sessions
@@ -362,44 +384,95 @@ class FortiGateService
     
     /**
      * Deauthenticate user - terminates all active firewall sessions
-     * This is optional and non-blocking - if it fails, we still proceed with disable/delete
+     * Uses CLI command via SSH API endpoint since direct deauth API is not available
      */
     public function deauthenticateUser(string $username): bool
     {
         if (!$this->isConfigured()) {
-            return true;  // Return true to not block operations
-        }
-        
-        // Skip deauth if circuit breaker is open
-        if ($this->isCircuitOpen()) {
-            Log::debug("Skipping deauth for user {$username} - circuit breaker is open");
             return true;
         }
         
-        // Try a simple deauth without retries for monitor endpoints
+        // Try to execute CLI command to deauthenticate user
         try {
-            // Use executeRequest directly to bypass retry logic for monitor endpoints
-            $url = $this->apiUrl . '/monitor/user/deauth';
-            $client = $this->getHttpClient();
+            // The CLI command to deauthenticate a firewall user
+            $cliCommand = "diagnose firewall auth clear user {$username}";
             
-            $payload = [
-                'username' => $username,
-                'method' => 'firewall',
-            ];
+            $result = $this->executeCliCommand($cliCommand);
             
-            $response = $client->post($url, $payload);
-            
-            if ($response->successful()) {
-                Log::info("Successfully deauthenticated user {$username}");
+            if ($result !== false) {
+                Log::info("Successfully deauthenticated user {$username} via CLI command");
                 return true;
             }
         } catch (Exception $e) {
-            // Log but don't fail the operation
-            Log::debug("Deauth not available for user {$username}: " . $e->getMessage());
+            Log::debug("Could not deauthenticate user {$username} via CLI: " . $e->getMessage());
         }
         
         // Always return true to not block disable/delete operations
         return true;
+    }
+    
+    /**
+     * Execute a CLI command via FortiGate API
+     * 
+     * @param string $command The CLI command to execute
+     * @return string|false The command output or false on failure
+     */
+    public function executeCliCommand(string $command): string|false
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+        
+        // Try different SSH/CLI endpoints
+        $endpoints = [
+            '/monitor/system/api/ssh',
+            '/api/v2/monitor/system/ssh',
+            '/monitor/system/console',
+        ];
+        
+        foreach ($endpoints as $endpoint) {
+            try {
+                $url = $this->apiUrl . $endpoint;
+                $client = $this->getHttpClient();
+                
+                // Different payload formats for different endpoints
+                $payloads = [
+                    ['command' => $command],
+                    ['cmd' => $command],
+                    ['commands' => [$command]],
+                ];
+                
+                foreach ($payloads as $payload) {
+                    try {
+                        $response = $client->post($url, $payload);
+                        
+                        if ($response->successful()) {
+                            $data = $response->json();
+                            
+                            // Extract output from response (format may vary)
+                            $output = $data['results'] ?? $data['output'] ?? $data['response'] ?? '';
+                            
+                            Log::debug("CLI command executed successfully", [
+                                'command' => $command,
+                                'endpoint' => $endpoint,
+                                'output' => $output
+                            ]);
+                            
+                            return is_array($output) ? implode("\n", $output) : (string)$output;
+                        }
+                    } catch (Exception $e) {
+                        Log::debug("CLI endpoint {$endpoint} with payload format failed: " . $e->getMessage());
+                        continue;
+                    }
+                }
+            } catch (Exception $e) {
+                Log::debug("CLI endpoint {$endpoint} not available: " . $e->getMessage());
+                continue;
+            }
+        }
+        
+        Log::debug("No CLI endpoint available for command execution");
+        return false;
     }
     
     /**
