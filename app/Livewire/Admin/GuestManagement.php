@@ -148,8 +148,8 @@ class GuestManagement extends Component
                 return;
             }
             
-            // Toggle status
-            $newStatus = $user->status === 'active' ? 'disabled' : 'active';
+            // Toggle status between active and suspended
+            $newStatus = $user->status === User::STATUS_ACTIVE ? User::STATUS_SUSPENDED : User::STATUS_ACTIVE;
             $user->status = $newStatus;
             $user->save();
             
@@ -157,7 +157,7 @@ class GuestManagement extends Component
             try {
                 $fortiGateService = app(FortiGateService::class);
                 $fortiGateService->updateUser($user->fortigate_username ?? $user->email, [
-                    'status' => $newStatus === 'active' ? 'enable' : 'disable'
+                    'status' => $newStatus === User::STATUS_ACTIVE ? 'enable' : 'disable'
                 ]);
             } catch (\Exception $fortiGateException) {
                 // Log the FortiGate error but continue
@@ -167,7 +167,7 @@ class GuestManagement extends Component
             // Log the action
             AuditLog::create([
                 'admin_user_id' => auth('admin')->id(),
-                'action' => $newStatus === 'active' ? 'enable_guest' : 'disable_guest',
+                'action' => $newStatus === User::STATUS_ACTIVE ? 'enable_guest' : 'disable_guest',
                 'model_type' => 'User',
                 'model_id' => $user->id,
                 'details' => [
@@ -184,7 +184,7 @@ class GuestManagement extends Component
             
             DB::commit();
             
-            $message = $newStatus === 'active' ? 'Invité activé avec succès' : 'Invité désactivé avec succès';
+            $message = $newStatus === User::STATUS_ACTIVE ? 'Invité activé avec succès' : 'Invité suspendu avec succès';
             $this->dispatch('notify', ['type' => 'success', 'message' => $message]);
             $this->dispatch('refreshList');
             
