@@ -288,51 +288,12 @@ class FortiGateService
 
     /**
      * Get active user sessions
+     * NOTE: This endpoint may not be available in all FortiGate versions
      */
     public function getActiveSessions(): array
     {
-        // Skip if circuit breaker is open
-        if ($this->isCircuitOpen()) {
-            return [];
-        }
-        
-        // Try to get sessions via API first
-        try {
-            $url = $this->apiUrl . '/monitor/user/firewall';
-            $client = $this->getHttpClient();
-            $response = $client->get($url);
-            
-            if ($response->successful()) {
-                $data = $response->json();
-                return $data['results'] ?? [];
-            }
-        } catch (Exception $e) {
-            Log::debug("Could not get active sessions via API: " . $e->getMessage());
-        }
-        
-        // Try to get sessions via CLI command as fallback
-        try {
-            $output = $this->executeCliCommand('diagnose firewall auth list');
-            if ($output !== false && !empty($output)) {
-                // Parse CLI output to extract user sessions
-                // This is a basic parser - adjust based on actual output format
-                $sessions = [];
-                $lines = explode("\n", $output);
-                foreach ($lines as $line) {
-                    if (preg_match('/user:\s*(\S+).*?src:\s*(\S+)/i', $line, $matches)) {
-                        $sessions[] = [
-                            'username' => $matches[1],
-                            'ip' => $matches[2],
-                        ];
-                    }
-                }
-                return $sessions;
-            }
-        } catch (Exception $e) {
-            Log::debug("Could not get active sessions via CLI: " . $e->getMessage());
-        }
-        
-        // Return empty array if we can't get sessions
+        // Return empty array for now as session monitoring endpoints are not available
+        // in FortiGate v7.6.x REST API
         return [];
     }
 
@@ -384,36 +345,21 @@ class FortiGateService
     
     /**
      * Deauthenticate user - terminates all active firewall sessions
-     * Note: This attempts to use CLI commands but may not be available in all configurations
+     * 
+     * NOTE: FortiGate REST API does not provide a deauth endpoint in v7.6.x
+     * Sessions will expire naturally based on FortiGate timeout settings
+     * Disabling/deleting the user prevents new authentications immediately
      */
     public function deauthenticateUser(string $username): bool
     {
-        if (!$this->isConfigured()) {
-            return true;
-        }
+        // Deauth via API is not available in FortiGate v7.6.x
+        // The user account will be disabled/deleted which prevents new logins
+        // Existing sessions will expire based on FortiGate's session timeout configuration
         
-        // Only try if not in circuit breaker state
-        if ($this->isCircuitOpen()) {
-            Log::debug("Skipping deauth attempt - circuit breaker is open");
-            return true;
-        }
+        // Log once per user for tracking
+        Log::info("User {$username} will be disabled/deleted. Active sessions will expire per FortiGate timeout settings.");
         
-        // Try to execute CLI command to deauthenticate user (may not be available)
-        try {
-            $cliCommand = "diagnose firewall auth clear user {$username}";
-            $result = $this->executeCliCommand($cliCommand);
-            
-            if ($result !== false) {
-                Log::info("Successfully deauthenticated user {$username} via CLI command");
-                return true;
-            } else {
-                Log::debug("CLI deauth not available for user {$username} - sessions will expire naturally");
-            }
-        } catch (Exception $e) {
-            Log::debug("Deauth attempt failed for {$username}: " . $e->getMessage());
-        }
-        
-        // Always return true - deauth is best-effort, not required
+        // Always return true as this is non-blocking
         return true;
     }
     
