@@ -103,7 +103,7 @@ class Setting extends Model
     /**
      * Get charter text for a specific language
      */
-    public static function getCharter(string $locale = null): string
+    public static function getCharter(?string $locale = null): string
     {
         $locale = $locale ?: app()->getLocale();
         $key = "charter_text_{$locale}";
@@ -121,7 +121,7 @@ class Setting extends Model
     /**
      * Get charter text as HTML (parsed from Markdown)
      */
-    public static function getCharterHtml(string $locale = null): string
+    public static function getCharterHtml(?string $locale = null): string
     {
         $markdown = self::getCharter($locale);
         $markdownService = app(\App\Services\MarkdownService::class);
