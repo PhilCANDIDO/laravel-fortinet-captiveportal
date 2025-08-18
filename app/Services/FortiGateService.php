@@ -292,21 +292,43 @@ class FortiGateService
      */
     public function getActiveSessions(): array
     {
-        // Return empty array for now as session monitoring endpoints are not available
-        // in FortiGate v7.6.x REST API
+        // Return empty array for now as we get sessions per user
         return [];
     }
 
     /**
-     * Get sessions for a specific user
+     * Get sessions for a specific user using the FortiGate v7.6.x endpoint
      */
     public function getUserSessions(string $username): array
     {
-        $sessions = $this->getActiveSessions();
+        if (!$this->isConfigured()) {
+            return [];
+        }
         
-        return array_filter($sessions, function ($session) use ($username) {
-            return $session['username'] === $username;
-        });
+        try {
+            // Use the monitor/user/firewall endpoint with username filter
+            $endpoint = '/monitor/user/firewall/';
+            $url = $this->apiUrl . $endpoint;
+            
+            // Add filter parameter for the specific username
+            $client = $this->getHttpClient();
+            $response = $client->get($url, [
+                'filter' => 'username=@' . $username
+            ]);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['results']) && is_array($data['results'])) {
+                    Log::debug("Found " . count($data['results']) . " active sessions for user {$username}");
+                    return $data['results'];
+                }
+            }
+        } catch (Exception $e) {
+            Log::debug("Could not get sessions for user {$username}: " . $e->getMessage());
+        }
+        
+        return [];
     }
 
     /**
@@ -345,22 +367,82 @@ class FortiGateService
     
     /**
      * Deauthenticate user - terminates all active firewall sessions
-     * 
-     * NOTE: FortiGate REST API does not provide a deauth endpoint in v7.6.x
-     * Sessions will expire naturally based on FortiGate timeout settings
-     * Disabling/deleting the user prevents new authentications immediately
+     * Uses the FortiGate v7.6.x specific endpoints
      */
     public function deauthenticateUser(string $username): bool
     {
-        // Deauth via API is not available in FortiGate v7.6.x
-        // The user account will be disabled/deleted which prevents new logins
-        // Existing sessions will expire based on FortiGate's session timeout configuration
+        if (!$this->isConfigured()) {
+            return true;
+        }
         
-        // Log once per user for tracking
-        Log::info("User {$username} will be disabled/deleted. Active sessions will expire per FortiGate timeout settings.");
-        
-        // Always return true as this is non-blocking
-        return true;
+        try {
+            // First, get all active sessions for this user
+            $sessions = $this->getUserSessions($username);
+            
+            if (empty($sessions)) {
+                Log::info("No active sessions to deauthenticate for user {$username}");
+                return true;
+            }
+            
+            // Deauthenticate each session
+            $deauthEndpoint = '/monitor/user/firewall/deauth';
+            $deauthCount = 0;
+            
+            foreach ($sessions as $session) {
+                try {
+                    // Build the deauth payload based on session data
+                    $payload = [
+                        'user_type' => 'firewall',
+                        'id' => $session['id'] ?? 0,
+                        'ip' => $session['ipaddr'] ?? '',
+                        'ip_version' => $session['src_type'] ?? 'ip4',
+                        'method' => $session['method'] ?? 'Firewall'
+                    ];
+                    
+                    // Add vdom parameter if available
+                    $params = [];
+                    if (isset($session['vdom'])) {
+                        $params['vdom'] = $session['vdom'];
+                    } else {
+                        $params['vdom'] = 'root'; // Default vdom
+                    }
+                    
+                    $url = $this->apiUrl . $deauthEndpoint . '?' . http_build_query($params);
+                    $client = $this->getHttpClient();
+                    $response = $client->post($url, $payload);
+                    
+                    if ($response->successful()) {
+                        $deauthCount++;
+                        Log::info("Successfully deauthenticated session for user {$username}", [
+                            'ip' => $payload['ip'],
+                            'session_id' => $payload['id']
+                        ]);
+                    } else {
+                        Log::warning("Failed to deauthenticate session for user {$username}", [
+                            'ip' => $payload['ip'],
+                            'response' => $response->body()
+                        ]);
+                    }
+                } catch (Exception $e) {
+                    Log::warning("Error deauthenticating session for user {$username}: " . $e->getMessage());
+                }
+            }
+            
+            if ($deauthCount > 0) {
+                Log::info("Deauthenticated {$deauthCount} session(s) for user {$username}");
+            }
+            
+            // Clear session cache
+            if ($this->config['cache']['enabled']) {
+                Cache::forget($this->getCacheKey('sessions'));
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to deauthenticate user {$username}: " . $e->getMessage());
+            // Return true anyway to not block disable/delete operations
+            return true;
+        }
     }
     
     /**
