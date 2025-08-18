@@ -236,10 +236,13 @@ class FortiGateService
             throw new FortiGateConnectionException('FortiGate service is not configured');
         }
         
-        // First try to remove user from group
+        // First deauthenticate any active sessions for this user
+        $this->deauthenticateUser($username);
+        
+        // Then try to remove user from group
         $this->removeUserFromGroup($username);
         
-        // Then delete the user
+        // Finally delete the user
         $endpoint = "/cmdb/user/local/{$username}";
         
         try {
@@ -316,7 +319,7 @@ class FortiGateService
     }
 
     /**
-     * Terminate user session
+     * Terminate user session (legacy method)
      */
     public function terminateSession(string $username, ?string $ipAddress = null): bool
     {
@@ -348,6 +351,61 @@ class FortiGateService
             return false;
         }
     }
+    
+    /**
+     * Deauthenticate user - terminates all active firewall sessions
+     * This is required before disabling or deleting a user to ensure they are disconnected
+     */
+    public function deauthenticateUser(string $username): bool
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+        
+        // Use the /monitor/user/deauth endpoint to deauthenticate user
+        $endpoint = '/monitor/user/deauth';
+        
+        try {
+            // First, get all active sessions for this user
+            $sessions = $this->getUserSessions($username);
+            
+            if (empty($sessions)) {
+                Log::info("No active sessions found for user: {$username}");
+                return true;
+            }
+            
+            // Deauthenticate each session
+            foreach ($sessions as $session) {
+                $payload = [
+                    'username' => $username,
+                ];
+                
+                // Add IP if available in session data
+                if (isset($session['ip'])) {
+                    $payload['ip'] = $session['ip'];
+                } elseif (isset($session['src_ip'])) {
+                    $payload['ip'] = $session['src_ip'];
+                }
+                
+                try {
+                    $this->request('POST', $endpoint, $payload);
+                    Log::info("Deauthenticated session for user: {$username}", $payload);
+                } catch (Exception $e) {
+                    Log::warning("Failed to deauthenticate session for user {$username}: {$e->getMessage()}");
+                }
+            }
+            
+            // Clear session cache
+            if ($this->config['cache']['enabled']) {
+                Cache::forget($this->getCacheKey('sessions'));
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to deauthenticate user {$username}: {$e->getMessage()}");
+            return false;
+        }
+    }
 
     /**
      * Check if a user exists in FortiGate
@@ -370,6 +428,10 @@ class FortiGateService
      */
     public function disableUser(string $username): bool
     {
+        // First deauthenticate any active sessions for this user
+        $this->deauthenticateUser($username);
+        
+        // Then disable the account
         return $this->updateUser($username, ['status' => 'disable']);
     }
 

@@ -76,9 +76,10 @@ class GuestManagement extends Component
                 return;
             }
             
-            // Try to delete from FortiGate (skip if not exists)
+            // Try to delete from FortiGate (deauthenticate first, then delete)
             try {
                 $fortiGateService = app(FortiGateService::class);
+                // The deleteUser method now handles deauthentication automatically
                 $fortiGateService->deleteUser($user->fortigate_username ?? $user->email);
             } catch (\Exception $fortiGateException) {
                 // Log the FortiGate error but continue with database deletion
@@ -156,9 +157,15 @@ class GuestManagement extends Component
             // Update in FortiGate
             try {
                 $fortiGateService = app(FortiGateService::class);
-                $fortiGateService->updateUser($user->fortigate_username ?? $user->email, [
-                    'status' => $newStatus === User::STATUS_ACTIVE ? 'enable' : 'disable'
-                ]);
+                
+                if ($newStatus === User::STATUS_SUSPENDED) {
+                    // Deauthenticate user before disabling
+                    $fortiGateService->deauthenticateUser($user->fortigate_username ?? $user->email);
+                    $fortiGateService->disableUser($user->fortigate_username ?? $user->email);
+                } else {
+                    // Enable user
+                    $fortiGateService->enableUser($user->fortigate_username ?? $user->email);
+                }
             } catch (\Exception $fortiGateException) {
                 // Log the FortiGate error but continue
                 Log::warning('Could not update user status in FortiGate: ' . $fortiGateException->getMessage());
