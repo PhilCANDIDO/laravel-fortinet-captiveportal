@@ -75,4 +75,23 @@ return [
     'accept_charter' => 'J\'accepte les conditions',
     'decline_charter' => 'Annuler',
     'processing' => 'Traitement',
+    
+    // Network connection
+    'connected_network' => 'Connecté au réseau',
+    'network' => 'Réseau',
+    'wired_network' => 'Réseau filaire',
+    'wireless_network' => 'Réseau sans fil',
+    
+    // Auto-authentication
+    'auto_authentication_title' => 'Connexion automatique',
+    'auto_authentication_message' => 'Vous allez être redirigé automatiquement pour vous connecter au réseau.',
+    'auto_authentication_ready' => 'Votre compte est prêt. Cliquez sur le bouton ci-dessous pour vous connecter au réseau.',
+    'auto_redirect_message' => 'Redirection automatique dans',
+    'seconds' => 'secondes',
+    'cancel_redirect' => 'Annuler la redirection',
+    'connect_now' => 'Se connecter maintenant',
+    
+    // Account status
+    'account_active' => 'Compte actif',
+    'account_active_message' => 'Votre compte est actif et prêt à être utilisé. Utilisez les identifiants ci-dessous pour vous connecter au réseau.',
 ];

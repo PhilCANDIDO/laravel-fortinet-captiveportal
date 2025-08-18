@@ -43,7 +43,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Nom
+                                        Account
                                     </th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Email
@@ -70,6 +70,9 @@
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900">
+                                            {{ $guest->fortigate_username }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
                                             {{ $guest->name }}
                                         </div>
                                     </td>
@@ -113,6 +116,35 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div class="flex items-center justify-end space-x-2">
+                                            <!-- View Detail Button -->
+                                            <button wire:click="showUserDetail({{ $guest->id }})" 
+                                                    class="text-blue-600 hover:text-blue-900"
+                                                    title="Voir les détails">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                            </button>
+                                            
+                                            <!-- Enable/Disable Button -->
+                                            @if($guest->status === 'active')
+                                            <button wire:click="toggleUserStatus({{ $guest->id }})" 
+                                                    class="text-yellow-600 hover:text-yellow-900"
+                                                    title="Désactiver">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                                </svg>
+                                            </button>
+                                            @else
+                                            <button wire:click="toggleUserStatus({{ $guest->id }})" 
+                                                    class="text-green-600 hover:text-green-900"
+                                                    title="Activer">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </button>
+                                            @endif
+                                            
                                             @if(!$guest->validated_at && $guest->validation_token && \App\Models\Setting::isGuestEmailValidationEnabled())
                                             <button wire:click="resendValidationEmail({{ $guest->id }})" 
                                                     wire:loading.attr="disabled"
@@ -195,6 +227,128 @@
                             type="button" 
                             class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                         Annuler
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+    
+    <!-- User Detail Modal -->
+    @if($showDetailModal && $userDetail)
+    <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                Détails de l'invité
+                            </h3>
+                            <div class="mt-4">
+                                <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Compte FortiGate</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->fortigate_username }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Nom complet</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->name }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->email }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Téléphone</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->phone ?? '-' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Société</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->company_name ?? '-' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Statut</dt>
+                                        <dd class="mt-1">
+                                            @if($userDetail->status === 'active')
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                    Actif
+                                                </span>
+                                            @elseif($userDetail->status === 'suspended')
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                    Suspendu
+                                                </span>
+                                            @else
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                    Inactif
+                                                </span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Date de création</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->created_at->format('d/m/Y H:i') }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Date d'expiration</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">
+                                            @if($userDetail->expires_at)
+                                                {{ $userDetail->expires_at->format('d/m/Y H:i') }}
+                                                @if($userDetail->expires_at->isPast())
+                                                    <span class="text-red-600">(Expiré)</span>
+                                                @endif
+                                            @else
+                                                -
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    @if($userDetail->validated_at)
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Email validé le</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->validated_at->format('d/m/Y H:i') }}</dd>
+                                    </div>
+                                    @endif
+                                    @if($userDetail->visit_reason)
+                                    <div class="sm:col-span-2">
+                                        <dt class="text-sm font-medium text-gray-500">Motif de la visite</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->visit_reason }}</dd>
+                                    </div>
+                                    @endif
+                                    @if($userDetail->network_ssid)
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Réseau</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->network_ssid }}</dd>
+                                    </div>
+                                    @endif
+                                    @if($userDetail->first_name || $userDetail->last_name)
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Prénom</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->first_name ?? '-' }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500">Nom</dt>
+                                        <dd class="mt-1 text-sm text-gray-900">{{ $userDetail->last_name ?? '-' }}</dd>
+                                    </div>
+                                    @endif
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button wire:click="$set('showDetailModal', false)" 
+                            type="button" 
+                            class="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Fermer
                     </button>
                 </div>
             </div>

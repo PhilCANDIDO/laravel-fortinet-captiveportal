@@ -236,10 +236,13 @@ class FortiGateService
             throw new FortiGateConnectionException('FortiGate service is not configured');
         }
         
-        // First try to remove user from group
+        // First deauthenticate any active sessions for this user
+        $this->deauthenticateUser($username);
+        
+        // Then try to remove user from group
         $this->removeUserFromGroup($username);
         
-        // Then delete the user
+        // Finally delete the user
         $endpoint = "/cmdb/user/local/{$username}";
         
         try {
@@ -285,38 +288,51 @@ class FortiGateService
 
     /**
      * Get active user sessions
+     * NOTE: This endpoint may not be available in all FortiGate versions
      */
     public function getActiveSessions(): array
     {
-        $endpoint = '/monitor/user/info';
-        
-        $cacheKey = $this->getCacheKey('sessions');
-        
-        if ($this->config['cache']['enabled']) {
-            return Cache::remember($cacheKey, $this->config['cache']['ttl'], function () use ($endpoint) {
-                $response = $this->request('GET', $endpoint);
-                return $response['results'] ?? [];
-            });
-        }
-        
-        $response = $this->request('GET', $endpoint);
-        return $response['results'] ?? [];
+        // Return empty array for now as we get sessions per user
+        return [];
     }
 
     /**
-     * Get sessions for a specific user
+     * Get sessions for a specific user using the FortiGate v7.6.x endpoint
      */
     public function getUserSessions(string $username): array
     {
-        $sessions = $this->getActiveSessions();
+        if (!$this->isConfigured()) {
+            return [];
+        }
         
-        return array_filter($sessions, function ($session) use ($username) {
-            return $session['username'] === $username;
-        });
+        try {
+            // Use the monitor/user/firewall endpoint with username filter
+            $endpoint = '/monitor/user/firewall/';
+            $url = $this->apiUrl . $endpoint;
+            
+            // Add filter parameter for the specific username
+            $client = $this->getHttpClient();
+            $response = $client->get($url, [
+                'filter' => 'username=@' . $username
+            ]);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['results']) && is_array($data['results'])) {
+                    Log::debug("Found " . count($data['results']) . " active sessions for user {$username}");
+                    return $data['results'];
+                }
+            }
+        } catch (Exception $e) {
+            Log::debug("Could not get sessions for user {$username}: " . $e->getMessage());
+        }
+        
+        return [];
     }
 
     /**
-     * Terminate user session
+     * Terminate user session (legacy method)
      */
     public function terminateSession(string $username, ?string $ipAddress = null): bool
     {
@@ -348,6 +364,182 @@ class FortiGateService
             return false;
         }
     }
+    
+    /**
+     * Deauthenticate user - terminates all active firewall sessions
+     * Uses the FortiGate v7.6.x specific endpoints
+     */
+    public function deauthenticateUser(string $username): bool
+    {
+        if (!$this->isConfigured()) {
+            return true;
+        }
+        
+        try {
+            // First, get all active sessions for this user
+            $sessions = $this->getUserSessions($username);
+            
+            if (empty($sessions)) {
+                Log::info("No active sessions to deauthenticate for user {$username}");
+                return true;
+            }
+            
+            // Deauthenticate each session
+            $deauthEndpoint = '/monitor/user/firewall/deauth';
+            $deauthCount = 0;
+            
+            foreach ($sessions as $session) {
+                try {
+                    // Build the deauth payload based on session data
+                    $payload = [
+                        'user_type' => 'firewall',
+                        'id' => $session['id'] ?? 0,
+                        'ip' => $session['ipaddr'] ?? '',
+                        'ip_version' => $session['src_type'] ?? 'ip4',
+                        'method' => $session['method'] ?? 'Firewall'
+                    ];
+                    
+                    // Add vdom parameter if available
+                    $params = [];
+                    if (isset($session['vdom'])) {
+                        $params['vdom'] = $session['vdom'];
+                    } else {
+                        $params['vdom'] = 'root'; // Default vdom
+                    }
+                    
+                    $url = $this->apiUrl . $deauthEndpoint . '?' . http_build_query($params);
+                    $client = $this->getHttpClient();
+                    $response = $client->post($url, $payload);
+                    
+                    if ($response->successful()) {
+                        $deauthCount++;
+                        Log::info("Successfully deauthenticated session for user {$username}", [
+                            'ip' => $payload['ip'],
+                            'session_id' => $payload['id']
+                        ]);
+                    } else {
+                        Log::warning("Failed to deauthenticate session for user {$username}", [
+                            'ip' => $payload['ip'],
+                            'response' => $response->body()
+                        ]);
+                    }
+                } catch (Exception $e) {
+                    Log::warning("Error deauthenticating session for user {$username}: " . $e->getMessage());
+                }
+            }
+            
+            if ($deauthCount > 0) {
+                Log::info("Deauthenticated {$deauthCount} session(s) for user {$username}");
+            }
+            
+            // Clear session cache
+            if ($this->config['cache']['enabled']) {
+                Cache::forget($this->getCacheKey('sessions'));
+            }
+            
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to deauthenticate user {$username}: " . $e->getMessage());
+            // Return true anyway to not block disable/delete operations
+            return true;
+        }
+    }
+    
+    /**
+     * Execute a CLI command via FortiGate API
+     * 
+     * @param string $command The CLI command to execute
+     * @return string|false The command output or false on failure
+     */
+    public function executeCliCommand(string $command): string|false
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+        
+        // Try different CLI/SSH endpoints - some require different methods
+        $attempts = [
+            // Standard monitor endpoints
+            ['method' => 'POST', 'endpoint' => '/monitor/system/console', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/monitor/cli/execute', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/monitor/web-ui/script', 'payload' => ['script' => $command]],
+            
+            // Try with different API versions
+            ['method' => 'POST', 'endpoint' => '/api/v2/monitor/system/cli', 'payload' => ['command' => $command]],
+            ['method' => 'POST', 'endpoint' => '/api/v2/cmdb/system/console', 'payload' => ['command' => $command]],
+            
+            // Try GET with command in query
+            ['method' => 'GET', 'endpoint' => '/monitor/system/cli', 'query' => ['command' => $command]],
+        ];
+        
+        foreach ($attempts as $attempt) {
+            try {
+                $url = $this->apiUrl . $attempt['endpoint'];
+                $client = $this->getHttpClient();
+                
+                if ($attempt['method'] === 'POST') {
+                    $response = $client->post($url, $attempt['payload'] ?? []);
+                } else {
+                    $response = $client->get($url, $attempt['query'] ?? []);
+                }
+                
+                if ($response->successful()) {
+                    $data = $response->json();
+                    
+                    // Extract output from response (format may vary)
+                    $output = $data['results'] ?? $data['output'] ?? $data['response'] ?? $data['data'] ?? '';
+                    
+                    Log::info("CLI command executed successfully", [
+                        'command' => $command,
+                        'endpoint' => $attempt['endpoint'],
+                        'output' => substr((string)$output, 0, 200) // Log first 200 chars
+                    ]);
+                    
+                    return is_array($output) ? implode("\n", $output) : (string)$output;
+                }
+            } catch (Exception $e) {
+                // Only log at debug level to avoid spam
+                Log::debug("CLI endpoint {$attempt['endpoint']} failed: " . substr($e->getMessage(), 0, 100));
+                continue;
+            }
+        }
+        
+        Log::debug("No CLI endpoint available for command execution");
+        return false;
+    }
+    
+    /**
+     * Try to deauthenticate a specific session
+     */
+    protected function tryDeauthSession(string $username, array $session): void
+    {
+        $endpoints = [
+            '/monitor/user/deauth',
+            '/monitor/user/kick',
+            '/monitor/firewall/deauth',
+        ];
+        
+        foreach ($endpoints as $endpoint) {
+            try {
+                $payload = ['username' => $username];
+                
+                // Add IP if available
+                if (isset($session['ip'])) {
+                    $payload['ip'] = $session['ip'];
+                } elseif (isset($session['src_ip'])) {
+                    $payload['ip'] = $session['src_ip'];
+                } elseif (isset($session['client_ip'])) {
+                    $payload['ip'] = $session['client_ip'];
+                }
+                
+                $this->request('POST', $endpoint, $payload);
+                Log::info("Deauthenticated session for user {$username} using {$endpoint}", $payload);
+                break;
+            } catch (Exception $e) {
+                Log::debug("Failed to deauth session using {$endpoint}: {$e->getMessage()}");
+            }
+        }
+    }
 
     /**
      * Check if a user exists in FortiGate
@@ -362,7 +554,13 @@ class FortiGateService
      */
     public function enableUser(string $username): bool
     {
-        return $this->updateUser($username, ['status' => 'enable']);
+        try {
+            $this->updateUser($username, ['status' => 'enable']);
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to enable user {$username}: {$e->getMessage()}");
+            return false;
+        }
     }
 
     /**
@@ -370,7 +568,17 @@ class FortiGateService
      */
     public function disableUser(string $username): bool
     {
-        return $this->updateUser($username, ['status' => 'disable']);
+        try {
+            // First deauthenticate any active sessions for this user
+            $this->deauthenticateUser($username);
+            
+            // Then disable the account
+            $this->updateUser($username, ['status' => 'disable']);
+            return true;
+        } catch (Exception $e) {
+            Log::error("Failed to disable user {$username}: {$e->getMessage()}");
+            return false;
+        }
     }
 
     /**
