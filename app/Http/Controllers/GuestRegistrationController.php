@@ -6,6 +6,9 @@ use App\Models\User;
 use App\Services\UserService;
 use App\Services\NotificationService;
 use App\Services\FortiGateService;
+use App\Services\PortalDataService;
+use App\Services\GuestUserService;
+use App\Http\Requests\GuestRegistrationRequest;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,56 +21,97 @@ class GuestRegistrationController extends Controller
     protected $userService;
     protected $notificationService;
     protected $fortiGateService;
+    protected $portalDataService;
+    protected $guestUserService;
     
     public function __construct(
         UserService $userService,
         NotificationService $notificationService,
-        FortiGateService $fortiGateService
+        FortiGateService $fortiGateService,
+        PortalDataService $portalDataService,
+        GuestUserService $guestUserService
     ) {
         $this->userService = $userService;
         $this->notificationService = $notificationService;
         $this->fortiGateService = $fortiGateService;
+        $this->portalDataService = $portalDataService;
+        $this->guestUserService = $guestUserService;
     }
     
     /**
      * Show guest registration form
      */
-    public function showForm()
+    public function showForm(Request $request)
     {
-        return view('guest.register');
+        // Check if portal_data is provided in the query parameters
+        $portalData = null;
+        $portalInfo = null;
+        
+        if ($request->has('portal_data')) {
+            $encodedData = $request->query('portal_data');
+            
+            // Log encoded data if in debug mode
+            if (config('logging.channels.' . config('logging.default') . '.level') === 'debug') {
+                Log::debug('Portal data: Received encoded data', [
+                    'encoded_data' => $encodedData,
+                    'length' => strlen($encodedData)
+                ]);
+            }
+            
+            $portalData = $this->portalDataService->decodePortalData($encodedData);
+            
+            if ($portalData) {
+                // Store in session for later use
+                $this->portalDataService->storeInSession($portalData);
+                $portalInfo = $this->portalDataService->getPortalInfo($portalData);
+                
+                Log::info('Guest registration form loaded with portal data', [
+                    'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                    'network_name' => $portalInfo['network_name'] ?? 'unknown',
+                    'client_ip' => $portalInfo['client_ip'] ?? 'unknown'
+                ]);
+            } else {
+                Log::warning('Invalid portal data provided', [
+                    'encoded_data' => substr($encodedData, 0, 100) . '...'
+                ]);
+            }
+        }
+        
+        return view('guest.register', compact('portalInfo'));
     }
     
     /**
      * Handle guest registration
      */
-    public function register(Request $request)
+    public function register(GuestRegistrationRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string|max:20',
-            'company_name' => 'nullable|string|max:200',
-            'visit_reason' => 'nullable|string|max:500',
-        ]);
-        
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
+        // Get portal data from session or request
+        $portalData = null;
+        if ($request->has('portal_data')) {
+            $portalData = $request->getPortalData();
+        } else {
+            // Try to get from session
+            $portalData = $this->portalDataService->getFromSession();
         }
         
         DB::beginTransaction();
         
         try {
-            // Create guest user (password is generated inside this method)
-            $user = $this->userService->createGuest($request->all());
+            // Create guest user with portal data
+            $user = $this->guestUserService->createGuestWithPortalData(
+                $request->validated(),
+                $portalData
+            );
             
             // Get the temporary password for the email
             $password = $user->temp_password;
             
-            // Send validation email
-            $this->notificationService->sendGuestValidationEmail($user, $password);
+            // Only send validation email if email validation is enabled
+            $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
+            if ($emailValidationEnabled) {
+                // Send validation email
+                $this->notificationService->sendGuestValidationEmail($user, $password);
+            }
             
             // Log the registration
             AuditLog::create([
@@ -91,10 +135,18 @@ class GuestRegistrationController extends Controller
             
             DB::commit();
             
+            // Store portal data in session for success page
+            if ($portalData) {
+                $this->portalDataService->storeInSession($portalData);
+            }
+            
             return redirect()->route('guest.register.success')
                 ->with('email', $user->email)
                 ->with('password', $password)
-                ->with('username', $user->fortigate_username ?? $user->email);
+                ->with('username', $user->fortigate_username)
+                ->with('has_portal_data', $portalData !== null)
+                ->with('email_validation_enabled', $emailValidationEnabled)
+                ->with('user_active', $user->is_active);
                 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -119,15 +171,73 @@ class GuestRegistrationController extends Controller
         $email = $request->session()->get('email');
         $password = $request->session()->get('password');
         $username = $request->session()->get('username');
+        $hasPortalData = $request->session()->get('has_portal_data', false);
+        $emailValidationEnabled = $request->session()->get('email_validation_enabled', true);
+        $userActive = $request->session()->get('user_active', false);
         
         if (!$email) {
             return redirect()->route('guest.register');
         }
         
-        // Get captive portal URL from FortiGate settings
-        $captivePortalUrl = \App\Models\FortiGateSettings::current()->captive_portal_url;
+        // Check for portal data to generate auto-auth URL
+        $autoAuthUrl = null;
+        $portalInfo = null;
+        $portalData = $this->portalDataService->getFromSession();
         
-        return view('guest.success', compact('email', 'password', 'username', 'captivePortalUrl'));
+        // Generate auto-auth URL if:
+        // 1. Portal data is available AND
+        // 2. Either email validation is disabled OR user is already active
+        if ($portalData && $hasPortalData && (!$emailValidationEnabled || $userActive)) {
+            try {
+                // Generate authentication URL with credentials
+                $autoAuthUrl = $this->portalDataService->generateAuthUrl(
+                    $portalData,
+                    $username,
+                    $password
+                );
+                
+                $portalInfo = $this->portalDataService->getPortalInfo($portalData);
+                
+                Log::info('Auto-authentication URL generated for guest', [
+                    'email' => $email,
+                    'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                    'network_name' => $portalInfo['network_name'] ?? 'unknown',
+                    'email_validation_enabled' => $emailValidationEnabled
+                ]);
+                
+                // Clear portal data from session after use
+                $this->portalDataService->clearFromSession();
+            } catch (\Exception $e) {
+                Log::error('Failed to generate auto-authentication URL', [
+                    'email' => $email,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        // Fallback to manual captive portal URL from settings
+        $captivePortalUrl = null;
+        if (!$autoAuthUrl) {
+            try {
+                $settings = \App\Models\FortiGateSettings::current();
+                $captivePortalUrl = $settings->captive_portal_url ?? null;
+            } catch (\Exception $e) {
+                Log::warning('Could not retrieve FortiGate settings', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        return view('guest.success', compact(
+            'email',
+            'password',
+            'username',
+            'captivePortalUrl',
+            'autoAuthUrl',
+            'portalInfo',
+            'emailValidationEnabled',
+            'userActive'
+        ));
     }
     
     /**
@@ -215,9 +325,38 @@ class GuestRegistrationController extends Controller
             
             DB::commit();
             
+            // Check if user has portal data for auto-authentication
+            $autoAuthUrl = null;
+            $portalInfo = null;
+            
+            if (!empty($user->portal_data)) {
+                try {
+                    $portalData = json_decode($user->portal_data, true);
+                    if ($portalData && $this->portalDataService->hasAutoAuth($portalData)) {
+                        // Generate auth URL if we still have the password
+                        // Note: For security, we don't store plain passwords, so auto-auth
+                        // might only work during initial registration flow
+                        $portalInfo = $this->portalDataService->getPortalInfo($portalData);
+                        
+                        Log::info('Guest email validated with portal data', [
+                            'user_id' => $user->id,
+                            'email' => $user->email,
+                            'network_type' => $portalInfo['network_type'] ?? 'unknown',
+                            'network_name' => $portalInfo['network_name'] ?? 'unknown'
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Failed to process portal data during validation', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
             return view('guest.validation-success', [
                 'user' => $user,
                 'charterUrl' => route('guest.charter.show'),
+                'portalInfo' => $portalInfo,
             ]);
             
         } catch (\Exception $e) {

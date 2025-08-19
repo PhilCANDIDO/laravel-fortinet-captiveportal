@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=8; IE=EDGE">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type="text/css">
+      body {
+        height: 100%;
+        font-family: Helvetica, Arial, sans-serif;
+        color: #6a6a6a;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      input[type=date], input[type=email], input[type=number], input[type=password], input[type=search], input[type=tel], input[type=text], input[type=time], input[type=url], select, textarea {
+        color: #262626;
+        vertical-align: baseline;
+        margin: .2em;
+        border-style: solid;
+        border-width: 1px;
+        border-color: #a9a9a9;
+        background-color: #fff;
+        box-sizing: border-box;
+        padding: 2px .5em;
+        appearance: none;
+        border-radius: 0;
+      }
+      input:focus {
+        border-color: #646464;
+        box-shadow: 0 0 1px 0 #a2a2a2;
+        outline: 0;
+      }
+      button {
+        padding: .5em 1em;
+        border: 1px solid;
+        border-radius: 3px;
+        min-width: 6em;
+        font-weight: 400;
+        font-size: .8em;
+        cursor: pointer;
+      }
+      button.primary {
+        color: #fff;
+        background-color: rgb(47, 113, 178);
+        border-color: rgb(34, 103, 173);
+      }
+      button.secondary {
+        color: #fff;
+        background-color: rgb(76, 175, 80);
+        border-color: rgb(66, 165, 70);
+      }
+      .message-container {
+        height: 500px;
+        width: 500px;
+        padding: 0;
+        margin: 10px;
+      }
+      .logo {
+        background: url(%%IMAGE:logo_v3_fguard_app%%) no-repeat left center;
+        height: 267px;
+        object-fit: contain;
+      }
+      table {
+        background-color: #fff;
+        border-spacing: 0;
+        margin: 1em;
+      }
+      table > tbody > tr > td:first-of-type:not([colspan]) {
+        white-space: nowrap;
+        color: rgba(0,0,0,.5);
+      }
+      table > tbody > tr > td:first-of-type {
+        vertical-align: top;
+      }
+      table > tbody > tr > td {
+        padding: .3em .3em;
+      }
+      .field {
+        display: table-row;
+      }
+      .field > :first-child {
+        display: table-cell;
+        width: 20%;
+      }
+      .field.single > :first-child {
+        display: inline;
+      }
+      .field > :not(:first-child) {
+        width: auto;
+        max-width: 100%;
+        display: inline-flex;
+        align-items: baseline;
+        vertical-align: top;
+        box-sizing: border-box;
+        margin: .3em;
+      }
+      .field > :not(:first-child) > input {
+        width: 230px;
+      }
+      .form-footer {
+        display: inline-flex;
+        justify-content: flex-start;
+      }
+      .form-footer > * {
+        margin: 1em;
+      }
+      .text-scrollable {
+        overflow: auto;
+        height: 150px;
+        border: 1px solid rgb(200, 200, 200);
+        padding: 5px;
+        font-size: 1em;
+      }
+      .text-centered {
+        text-align: center;
+      }
+      .text-container {
+        margin: 1em 1.5em;
+      }
+      .flex-container {
+        display: flex;
+      }
+      .flex-container.column {
+        flex-direction: column;
+      }
+      
+      /* Styles additionnels pour la section d'inscription */
+      .divider {
+        margin: 20px 0;
+        text-align: center;
+        position: relative;
+      }
+      .divider:before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: #ddd;
+      }
+      .divider span {
+        background: white;
+        padding: 0 15px;
+        position: relative;
+        color: #888;
+      }
+      .guest-section {
+        background-color: #f5f5f5;
+        padding: 20px;
+        border-radius: 5px;
+        margin-top: 20px;
+        text-align: center;
+      }
+      .guest-section h3 {
+        margin-top: 0;
+        color: #444;
+      }
+      .guest-section p {
+        color: #666;
+        margin: 10px 0;
+      }
+      .btn-register {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: rgb(76, 175, 80);
+        color: white;
+        text-decoration: none;
+        border-radius: 3px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+      }
+      .btn-register:hover {
+        background-color: rgb(66, 165, 70);
+      }
+    </style>
+    <title>
+      Firewall Authentication
+    </title>
+  </head>
+  <body>
+    <div class="message-container">
+      <div class="logo">
+      </div>
+      <h1>
+        Authentication Required
+      </h1>
+      <form action="%%AUTH_POST_URL%%" method="post" id="loginForm">
+        <input type="hidden" name="%%REDIRID%%" value="%%PROTURI%%">
+        <input type="hidden" name="%%MAGICID%%" value="%%MAGICVAL%%">
+        <input type="hidden" name="%%METHODID%%" value="%%METHODVAL%%">
+        <p>
+          %%QUESTION%%
+        </p>
+        <div class="field">
+          <label for="ft_un">
+            Username
+          </label>
+          <div>
+            <input name="%%USERNAMEID%%" id="ft_un" type="text" autocorrect="off" autocapitalize="off">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ft_pd">
+            Password
+          </label>
+          <div>
+            <input name="%%PASSWORDID%%" id="ft_pd" type="password" autocomplete="off">
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="primary" type="submit">
+            Continue
+          </button>
+        </div>
+      </form>
+      
+      <!-- Section pour les invités -->
+      <div class="divider">
+        <span>
+          OU
+        </span>
+      </div>
+      
+      <div class="guest-section">
+        <h3>
+          Première visite ?
+        </h3>
+        <p>
+          Créez votre compte invité pour accéder à Internet
+        </p>
+        <a href="#" id="registerLink" class="btn-register" target="_blank">
+          Créer un compte invité
+        </a>
+      </div>
+    </div>
+  </body>
+  <script>
+    // Script pour capturer les paramètres du portail captif et les envoyer à votre application
+    document.addEventListener('DOMContentLoaded', function() {
+      // URL de votre application Laravel
+      const LARAVEL_APP_URL = 'http://captiveportal.test/guest/register';
+      
+      // Récupération de l'URL actuelle complète avec tous les paramètres
+      const currentUrl = window.location.href;
+      
+      // Récupération des valeurs des champs cachés du formulaire
+      const authPostUrl = '%%AUTH_POST_URL%%';
+      const redirId = '%%REDIRID%%';
+      const redirValue = '%%PROTURI%%';
+      const magicId = '%%MAGICID%%';
+      const magicValue = '%%MAGICVAL%%';
+      const methodId = '%%METHODID%%';
+      const methodValue = '%%METHODVAL%%';
+      const usernameId = '%%USERNAMEID%%';
+      const passwordId = '%%PASSWORDID%%';
+      
+      // Construction de l'objet avec tous les paramètres
+      const portalData = {
+        portal_url: currentUrl,
+        auth_post_url: authPostUrl,
+        redir_id: redirId,
+        redir_value: redirValue,
+        magic_id: magicId,
+        magic_value: magicValue,
+        method_id: methodId,
+        method_value: methodValue,
+        username_id: usernameId,
+        password_id: passwordId
+      }
+      ;
+      
+      // Encodage des données en base64 pour les transmettre de manière sécurisée
+      const encodedData = btoa(JSON.stringify(portalData));
+      
+      // Construction de l'URL avec les paramètres
+      const registerUrl = LARAVEL_APP_URL + '?portal_data=' + encodeURIComponent(encodedData);
+      
+      // Mise à jour du lien d'inscription
+      document.getElementById('registerLink').href = registerUrl;
+      
+      // Gestion optionnelle de l'auto-remplissage si on revient avec des credentials
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoUsername = urlParams.get('auto_username');
+      const autoPassword = urlParams.get('auto_password');
+      
+      if (autoUsername && autoPassword) {
+        document.getElementById('ft_un').value = autoUsername;
+        document.getElementById('ft_pd').value = autoPassword;
+        
+        // Optionnel : soumettre automatiquement le formulaire
+        // setTimeout(() => {
+        // document.getElementById('loginForm').submit();
+        // }, 1000);
+      }
+    });
+  </script>
+</html>
