@@ -39,4 +39,10 @@ return [
     'password_changed_successfully' => 'Password changed successfully.',
     'extend_session' => 'Extend Session',
     'session_warning_message' => 'Your session will expire in',
+    'force_logout_other_sessions' => 'Force logout other sessions',
+    'force_logout_title' => 'Force Logout',
+    'force_logout_description' => 'To force logout all your other active sessions, please confirm your identity by entering your credentials.',
+    'force_logout_button' => 'Logout All Sessions',
+    'all_sessions_logged_out' => 'All sessions have been logged out. You can now log in again.',
+    'invalid_credentials' => 'Invalid credentials.',
 ];
