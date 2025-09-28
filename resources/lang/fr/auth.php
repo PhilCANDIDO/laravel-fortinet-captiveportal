@@ -39,4 +39,10 @@ return [
     'password_changed_successfully' => 'Mot de passe modifié avec succès.',
     'extend_session' => 'Prolonger la session',
     'session_warning_message' => 'Votre session va expirer dans',
+    'force_logout_other_sessions' => 'Forcer la déconnexion des autres sessions',
+    'force_logout_title' => 'Forcer la déconnexion',
+    'force_logout_description' => 'Pour forcer la déconnexion de toutes vos autres sessions actives, veuillez confirmer votre identité en saisissant vos identifiants.',
+    'force_logout_button' => 'Déconnecter toutes les sessions',
+    'all_sessions_logged_out' => 'Toutes les sessions ont été déconnectées. Vous pouvez maintenant vous reconnecter.',
+    'invalid_credentials' => 'Identifiants invalides.',
 ];

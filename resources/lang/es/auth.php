@@ -39,4 +39,10 @@ return [
     'password_changed_successfully' => 'Contraseña cambiada con éxito.',
     'extend_session' => 'Extender Sesión',
     'session_warning_message' => 'Tu sesión expirará en',
+    'force_logout_other_sessions' => 'Forzar cierre de otras sesiones',
+    'force_logout_title' => 'Forzar Cierre de Sesión',
+    'force_logout_description' => 'Para forzar el cierre de todas tus otras sesiones activas, confirma tu identidad ingresando tus credenciales.',
+    'force_logout_button' => 'Cerrar Todas las Sesiones',
+    'all_sessions_logged_out' => 'Todas las sesiones han sido cerradas. Ahora puedes iniciar sesión nuevamente.',
+    'invalid_credentials' => 'Credenciales inválidas.',
 ];
