@@ -19,6 +19,7 @@ class ConsultantManagement extends Component
     public $showCreateModal = false;
     public $showEditModal = false;
     public $showDeleteModal = false;
+    public $showCredentialsModal = false;
     
     public $search = '';
     public $statusFilter = '';
@@ -35,6 +36,11 @@ class ConsultantManagement extends Component
     public $expires_at;
     public $notes;
     public $send_credentials = true;
+
+    // Credentials display
+    public $displayUsername;
+    public $displayPassword;
+    public $captivePortalUrl;
     
     protected $rules = [
         'first_name' => 'required|string|max:100',
@@ -107,22 +113,33 @@ class ConsultantManagement extends Component
         try {
             // Create consultant
             $consultant = $this->userService->createConsultant([
+                'name' => trim($this->first_name . ' ' . $this->last_name),
                 'first_name' => $this->first_name,
                 'last_name' => $this->last_name,
                 'email' => $this->email,
                 'phone' => $this->phone,
                 'company_name' => $this->company_name,
                 'expires_at' => $this->expires_at,
-                'notes' => $this->notes,
+                'admin_notes' => $this->notes,
             ]);
             
             // Generate password
             $password = $this->userService->generateSecurePassword();
             $consultant->password = bcrypt($password);
+            $consultant->fortigate_password = $password;
+
+            // Generate FortiGate username
+            $consultant->fortigate_username = 'consultant-' . $consultant->id;
             $consultant->save();
-            
+
             // Sync with FortiGate
-            $this->fortiGateService->createUser($consultant);
+            $this->fortiGateService->createUser([
+                'username' => $consultant->fortigate_username,
+                'password' => $password,
+                'email' => $consultant->email,
+                'status' => 'enable',
+                'expires_at' => $consultant->expires_at ? $consultant->expires_at->format('Y-m-d') : null,
+            ]);
             
             // Send credentials if requested
             if ($this->send_credentials) {
@@ -130,24 +147,25 @@ class ConsultantManagement extends Component
             }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'consultant.created',
-                'details' => [
-                    'consultant_id' => $consultant->id,
+            AuditLog::logUserManagement(
+                'created',
+                'consultant',
+                $consultant->id,
+                null,
+                [
                     'email' => $consultant->email,
-                    'expires_at' => $consultant->expires_at,
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+                    'name' => $consultant->name,
+                    'company_name' => $consultant->company_name,
+                    'expires_at' => $consultant->expires_at?->format('Y-m-d'),
+                ]
+            );
             
             DB::commit();
-            
+
             $this->showCreateModal = false;
             $this->resetForm();
-            
-            session()->flash('success', __('messages.consultant_created'));
+
+            session()->flash('success', __('messages.consultant_created') . ' | ' . __('consultant.fortigate_username') . ': ' . $consultant->fortigate_username . ' | ' . __('consultant.fortigate_password') . ': ' . $password);
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -195,29 +213,37 @@ class ConsultantManagement extends Component
             $consultant = User::findOrFail($this->consultantId);
             
             $consultant->update([
+                'name' => trim($this->first_name . ' ' . $this->last_name),
                 'first_name' => $this->first_name,
                 'last_name' => $this->last_name,
                 'email' => $this->email,
                 'phone' => $this->phone,
                 'company_name' => $this->company_name,
                 'expires_at' => $this->expires_at,
-                'notes' => $this->notes,
+                'admin_notes' => $this->notes,
             ]);
-            
+
             // Sync with FortiGate
-            $this->fortiGateService->updateUser($consultant);
+            if ($consultant->fortigate_username) {
+                $this->fortiGateService->updateUser(
+                    $consultant->fortigate_username,
+                    [
+                        'email' => $consultant->email,
+                        'expires_at' => $consultant->expires_at ? $consultant->expires_at->format('Y-m-d') : null,
+                        'status' => $consultant->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    ]
+                );
+            }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'consultant.updated',
-                'details' => [
-                    'consultant_id' => $consultant->id,
-                    'changes' => $consultant->getChanges(),
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+            $changes = $consultant->getChanges();
+            AuditLog::logUserManagement(
+                'updated',
+                'consultant',
+                $consultant->id,
+                $consultant->getOriginal(),
+                $changes
+            );
             
             DB::commit();
             
@@ -250,21 +276,23 @@ class ConsultantManagement extends Component
         
         try {
             $consultant = User::findOrFail($this->consultantId);
-            
+
             // Delete from FortiGate
-            $this->fortiGateService->deleteUser($consultant);
+            if ($consultant->fortigate_username) {
+                $this->fortiGateService->deleteUser($consultant->fortigate_username);
+            }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'consultant.deleted',
-                'details' => [
-                    'consultant_id' => $consultant->id,
+            AuditLog::logUserManagement(
+                'deleted',
+                'consultant',
+                $consultant->id,
+                [
                     'email' => $consultant->email,
+                    'name' => $consultant->name,
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+                null
+            );
             
             // Delete the user
             $consultant->delete();
@@ -297,24 +325,35 @@ class ConsultantManagement extends Component
             $newExpiry = $consultant->expires_at->addDays($days);
             $consultant->expires_at = $newExpiry;
             $consultant->save();
-            
+
             // Sync with FortiGate
-            $this->fortiGateService->updateUser($consultant);
+            if ($consultant->fortigate_username) {
+                $this->fortiGateService->updateUser(
+                    $consultant->fortigate_username,
+                    [
+                        'expires_at' => $consultant->expires_at->format('Y-m-d'),
+                    ]
+                );
+            }
             
             // Send notification
             $this->notificationService->sendExpirationReminder($consultant, $days);
             
             // Log the action
-            AuditLog::create([
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
                 'user_id' => auth('admin')->id(),
-                'action' => 'consultant.extended',
-                'details' => [
-                    'consultant_id' => $consultant->id,
+                'user_email' => auth('admin')->user()->email,
+                'action' => 'extended',
+                'resource_type' => 'consultant',
+                'resource_id' => $consultant->id,
+                'new_values' => [
                     'days_extended' => $days,
-                    'new_expiry' => $newExpiry,
+                    'new_expiry' => $newExpiry->format('Y-m-d'),
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'status' => AuditLog::STATUS['SUCCESS'],
             ]);
             
             DB::commit();
@@ -333,50 +372,13 @@ class ConsultantManagement extends Component
         }
     }
     
-    public function resetPassword($id)
+    public function showCredentials($id)
     {
-        DB::beginTransaction();
-        
-        try {
-            $consultant = User::findOrFail($id);
-            
-            // Generate new password
-            $password = $this->userService->generateSecurePassword();
-            $consultant->password = bcrypt($password);
-            $consultant->save();
-            
-            // Sync with FortiGate
-            $this->fortiGateService->updateUser($consultant);
-            
-            // Send new credentials
-            $this->notificationService->sendWelcomeEmail($consultant, $password);
-            
-            // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'consultant.password_reset',
-                'details' => [
-                    'consultant_id' => $consultant->id,
-                    'email' => $consultant->email,
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-            
-            DB::commit();
-            
-            session()->flash('success', __('messages.password_reset_sent'));
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            Log::error('Failed to reset consultant password', [
-                'error' => $e->getMessage(),
-                'consultant_id' => $id,
-            ]);
-            
-            session()->flash('error', __('messages.password_reset_failed'));
-        }
+        $consultant = User::findOrFail($id);
+        $this->displayUsername = $consultant->fortigate_username;
+        $this->displayPassword = $consultant->fortigate_password;
+        $this->captivePortalUrl = \App\Models\FortiGateSettings::current()->captive_portal_url ?? 'https://192.168.1.1/captive-portal';
+        $this->showCredentialsModal = true;
     }
     
     public function toggleStatus($id)
@@ -392,27 +394,42 @@ class ConsultantManagement extends Component
             
             $consultant->status = $newStatus;
             $consultant->save();
-            
+
             // Sync with FortiGate
-            if ($newStatus === User::STATUS_SUSPENDED) {
-                $this->fortiGateService->disableUser($consultant);
-                $this->notificationService->sendAccountSuspendedEmail($consultant);
-            } else {
-                $this->fortiGateService->enableUser($consultant);
-                $this->notificationService->sendAccountReactivatedEmail($consultant);
+            if ($consultant->fortigate_username) {
+                $this->fortiGateService->updateUser(
+                    $consultant->fortigate_username,
+                    [
+                        'status' => $newStatus === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    ]
+                );
+
+                // Deauthenticate if suspending
+                if ($newStatus === User::STATUS_SUSPENDED) {
+                    $this->fortiGateService->deauthenticateUser($consultant->fortigate_username);
+                    $this->notificationService->sendAccountSuspendedEmail($consultant);
+                } else {
+                    $this->notificationService->sendAccountReactivatedEmail($consultant);
+                }
             }
             
             // Log the action
-            AuditLog::create([
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
                 'user_id' => auth('admin')->id(),
-                'action' => 'consultant.status_changed',
-                'details' => [
-                    'consultant_id' => $consultant->id,
-                    'old_status' => $consultant->getOriginal('status'),
-                    'new_status' => $newStatus,
+                'user_email' => auth('admin')->user()->email,
+                'action' => 'status_changed',
+                'resource_type' => 'consultant',
+                'resource_id' => $consultant->id,
+                'old_values' => [
+                    'status' => $consultant->getOriginal('status'),
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'new_values' => [
+                    'status' => $newStatus,
+                ],
+                'status' => AuditLog::STATUS['SUCCESS'],
             ]);
             
             DB::commit();

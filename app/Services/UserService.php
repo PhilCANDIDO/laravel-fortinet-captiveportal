@@ -40,6 +40,8 @@ class UserService
             
             $user = User::create([
                 'name' => $data['name'],
+                'first_name' => $data['first_name'] ?? null,
+                'last_name' => $data['last_name'] ?? null,
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'user_type' => User::TYPE_EMPLOYEE,
@@ -99,6 +101,8 @@ class UserService
             
             $user = User::create([
                 'name' => $data['name'],
+                'first_name' => $data['first_name'] ?? null,
+                'last_name' => $data['last_name'] ?? null,
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'user_type' => User::TYPE_CONSULTANT,
@@ -474,19 +478,45 @@ class UserService
         $count = 0;
         
         foreach ($expiredUsers as $user) {
-            $user->markAsExpired();
-            
-            // Remove from FortiGate
-            if ($this->fortiGateService->isConfigured()) {
-                $user->removeFromFortiGate();
+            // For guests, delete them completely after expiration
+            if ($user->isGuest()) {
+                // Log before deletion
+                Log::info('Deleting expired guest user', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'expired_at' => $user->expires_at,
+                    'fortigate_username' => $user->fortigate_username
+                ]);
+                
+                // Log the action in audit
+                $this->auditService->log(
+                    'guest_expired_deleted',
+                    "Guest account expired and deleted: {$user->email}",
+                    [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'expired_at' => $user->expires_at
+                    ]
+                );
+                
+                // Delete the user (this also removes from FortiGate)
+                $this->deleteUser($user);
+            } else {
+                // For consultants and employees, just mark as expired
+                $user->markAsExpired();
+                
+                // Remove from FortiGate
+                if ($this->fortiGateService->isConfigured()) {
+                    $user->removeFromFortiGate();
+                }
+                
+                // Log the action
+                $this->auditService->log(
+                    'user_expired',
+                    "User account expired: {$user->email}",
+                    ['user_id' => $user->id]
+                );
             }
-            
-            // Log the action
-            $this->auditService->log(
-                'user_expired',
-                "User account expired: {$user->email}",
-                ['user_id' => $user->id]
-            );
             
             $count++;
         }

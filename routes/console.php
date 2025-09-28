@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ExpireUsersJob;
+use App\Jobs\DeleteExpiredGuestsJob;
 use App\Jobs\SendExpirationReminderJob;
 use App\Jobs\CleanupExpiredSessions;
 use App\Jobs\CleanupOldAuditLogs;
@@ -23,6 +24,9 @@ Artisan::command('inspire', function () {
 
 // Check for expired users every hour
 Schedule::job(new ExpireUsersJob)->hourly();
+
+// Delete expired guests every 30 minutes
+Schedule::job(new DeleteExpiredGuestsJob)->everyThirtyMinutes();
 
 // Send expiration reminders daily at 9 AM
 Schedule::job(new SendExpirationReminderJob)->dailyAt('09:00');

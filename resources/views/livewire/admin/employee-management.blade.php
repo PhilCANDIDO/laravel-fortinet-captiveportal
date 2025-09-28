@@ -108,6 +108,9 @@
                         {{ __('employee.department') }}
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        FortiGate Username
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         {{ __('employee.phone') }}
                     </th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -138,6 +141,11 @@
                             <div class="text-sm text-gray-900">{{ $employee->department ?: '-' }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-mono text-gray-900">
+                                {{ $employee->fortigate_username ?? '-' }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">{{ $employee->phone ?: '-' }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -165,11 +173,12 @@
                                     </svg>
                                 </button>
                                 
-                                <button wire:click="resetPassword({{ $employee->id }})" 
-                                        class="text-yellow-600 hover:text-yellow-900"
-                                        title="{{ __('employee.reset_password') }}">
+                                <button wire:click="showCredentials({{ $employee->id }})"
+                                        class="text-blue-600 hover:text-blue-900"
+                                        title="{{ __('employee.show_credentials') }}">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                     </svg>
                                 </button>
                                 
@@ -199,7 +208,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                             {{ __('employee.no_employees') }}
                         </td>
                     </tr>
@@ -366,5 +375,79 @@
             </div>
         </div>
     @endif
-    
+
+    <!-- Credentials Display Modal -->
+    @if ($showCredentialsModal)
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">{{ __('employee.credentials_title') }}</h3>
+
+                <div class="space-y-4">
+                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    {{ __('employee.credentials_info') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('employee.captive_portal_url') }}</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" value="{{ $captivePortalUrl }}" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-sm">
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ $captivePortalUrl }}')" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200" title="{{ __('common.copy') }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('employee.fortigate_username') }}</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" value="{{ $displayUsername }}" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-sm">
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ $displayUsername }}')" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200" title="{{ __('common.copy') }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('employee.fortigate_password') }}</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="text" value="{{ $displayPassword }}" readonly class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-sm">
+                            <button type="button" onclick="navigator.clipboard.writeText('{{ $displayPassword }}')" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200" title="{{ __('common.copy') }}">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-between">
+                    <button type="button" onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                        <span>{{ __('common.print') }}</span>
+                    </button>
+                    <button wire:click="$set('showCredentialsModal', false)" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        {{ __('common.close') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
 </div>
