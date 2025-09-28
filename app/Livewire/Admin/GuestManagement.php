@@ -87,21 +87,16 @@ class GuestManagement extends Component
             }
             
             // Log the action
-            AuditLog::create([
-                'admin_user_id' => auth('admin')->id(),
-                'action' => 'delete_guest',
-                'model_type' => 'User',
-                'model_id' => $user->id,
-                'details' => [
+            AuditLog::logUserManagement(
+                'deleted',
+                'guest',
+                $user->id,
+                [
                     'email' => $user->email,
-                    'name' => $user->name
+                    'name' => $user->name,
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'event_type' => 'user_management',
-                'event_category' => 'delete',
-                'status' => 'success'
-            ]);
+                null
+            );
             
             // Delete from database
             $user->delete();
@@ -172,21 +167,22 @@ class GuestManagement extends Component
             }
             
             // Log the action
-            AuditLog::create([
-                'admin_user_id' => auth('admin')->id(),
-                'action' => $newStatus === User::STATUS_ACTIVE ? 'enable_guest' : 'disable_guest',
-                'model_type' => 'User',
-                'model_id' => $user->id,
-                'details' => [
-                    'email' => $user->email,
-                    'name' => $user->name,
-                    'new_status' => $newStatus
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
+                'user_id' => auth('admin')->id(),
+                'user_email' => auth('admin')->user()->email,
+                'action' => $newStatus === User::STATUS_ACTIVE ? 'enabled' : 'disabled',
+                'resource_type' => 'guest',
+                'resource_id' => $user->id,
+                'old_values' => [
+                    'status' => $oldStatus,
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'event_type' => 'user_management',
-                'event_category' => 'status_change',
-                'status' => 'success'
+                'new_values' => [
+                    'status' => $newStatus,
+                ],
+                'status' => AuditLog::STATUS['SUCCESS'],
             ]);
             
             DB::commit();
@@ -256,20 +252,20 @@ class GuestManagement extends Component
             $notificationService->sendGuestValidationEmail($user, $password);
             
             // Log the action
-            AuditLog::create([
-                'admin_user_id' => auth('admin')->id(),
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
+                'user_id' => auth('admin')->id(),
+                'user_email' => auth('admin')->user()->email,
                 'action' => 'resend_validation_email',
-                'model_type' => 'User',
-                'model_id' => $user->id,
-                'details' => [
+                'resource_type' => 'guest',
+                'resource_id' => $user->id,
+                'new_values' => [
                     'email' => $user->email,
-                    'name' => $user->name
+                    'name' => $user->name,
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-                'event_type' => 'user_management',
-                'event_category' => 'email',
-                'status' => 'success'
+                'status' => AuditLog::STATUS['SUCCESS'],
             ]);
             
             $this->dispatch('notify', ['type' => 'success', 'message' => 'Email de validation renvoyé']);

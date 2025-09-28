@@ -18,4 +18,6 @@ return [
     'processing' => 'Traitement...',
     'yes' => 'Oui',
     'no' => 'Non',
+    'copy' => 'Copier',
+    'print' => 'Imprimer',
 ];

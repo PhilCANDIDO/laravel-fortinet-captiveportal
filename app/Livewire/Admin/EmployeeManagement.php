@@ -20,6 +20,7 @@ class EmployeeManagement extends Component
     public $showEditModal = false;
     public $showDeleteModal = false;
     public $showImportModal = false;
+    public $showCredentialsModal = false;
     
     public $search = '';
     public $statusFilter = '';
@@ -37,7 +38,12 @@ class EmployeeManagement extends Component
     public $employee_id;
     public $notes;
     public $send_credentials = true;
-    
+
+    // Credentials display
+    public $displayUsername;
+    public $displayPassword;
+    public $captivePortalUrl;
+
     // Import fields
     public $importFile;
     
@@ -121,22 +127,32 @@ class EmployeeManagement extends Component
         try {
             // Create employee
             $employee = $this->userService->createEmployee([
+                'name' => trim($this->first_name . ' ' . $this->last_name),
                 'first_name' => $this->first_name,
                 'last_name' => $this->last_name,
                 'email' => $this->email,
                 'phone' => $this->phone,
                 'employee_id' => $this->employee_id,
                 'department' => $this->department,
-                'notes' => $this->notes,
+                'admin_notes' => $this->notes,
             ]);
             
             // Generate password
             $password = $this->userService->generateSecurePassword();
             $employee->password = bcrypt($password);
+            $employee->fortigate_password = $password;
+
+            // Generate FortiGate username
+            $employee->fortigate_username = 'employee-' . $employee->id;
             $employee->save();
-            
+
             // Sync with FortiGate
-            $this->fortiGateService->createUser($employee);
+            $this->fortiGateService->createUser([
+                'username' => $employee->fortigate_username,
+                'password' => $password,
+                'email' => $employee->email,
+                'status' => 'enable',
+            ]);
             
             // Send credentials if requested
             if ($this->send_credentials) {
@@ -144,24 +160,24 @@ class EmployeeManagement extends Component
             }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'employee.created',
-                'details' => [
-                    'employee_id' => $employee->id,
+            AuditLog::logUserManagement(
+                'created',
+                'employee',
+                $employee->id,
+                null,
+                [
                     'email' => $employee->email,
+                    'name' => $employee->name,
                     'department' => $employee->department,
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+                ]
+            );
             
             DB::commit();
-            
+
             $this->showCreateModal = false;
             $this->resetForm();
-            
-            session()->flash('success', __('messages.employee_created'));
+
+            session()->flash('success', __('messages.employee_created') . ' | ' . __('employee.fortigate_username') . ': ' . $employee->fortigate_username . ' | ' . __('employee.fortigate_password') . ': ' . $password);
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -209,29 +225,36 @@ class EmployeeManagement extends Component
             $employee = User::findOrFail($this->employeeId);
             
             $employee->update([
+                'name' => trim($this->first_name . ' ' . $this->last_name),
                 'first_name' => $this->first_name,
                 'last_name' => $this->last_name,
                 'email' => $this->email,
                 'phone' => $this->phone,
                 'employee_id' => $this->employee_id,
                 'department' => $this->department,
-                'notes' => $this->notes,
+                'admin_notes' => $this->notes,
             ]);
-            
+
             // Sync with FortiGate
-            $this->fortiGateService->updateUser($employee);
+            if ($employee->fortigate_username) {
+                $this->fortiGateService->updateUser(
+                    $employee->fortigate_username,
+                    [
+                        'email' => $employee->email,
+                        'status' => $employee->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    ]
+                );
+            }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'employee.updated',
-                'details' => [
-                    'employee_id' => $employee->id,
-                    'changes' => $employee->getChanges(),
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+            $changes = $employee->getChanges();
+            AuditLog::logUserManagement(
+                'updated',
+                'employee',
+                $employee->id,
+                $employee->getOriginal(),
+                $changes
+            );
             
             DB::commit();
             
@@ -264,22 +287,24 @@ class EmployeeManagement extends Component
         
         try {
             $employee = User::findOrFail($this->employeeId);
-            
+
             // Delete from FortiGate
-            $this->fortiGateService->deleteUser($employee);
+            if ($employee->fortigate_username) {
+                $this->fortiGateService->deleteUser($employee->fortigate_username);
+            }
             
             // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'employee.deleted',
-                'details' => [
-                    'employee_id' => $employee->id,
+            AuditLog::logUserManagement(
+                'deleted',
+                'employee',
+                $employee->id,
+                [
                     'email' => $employee->email,
+                    'name' => $employee->name,
                     'department' => $employee->department,
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+                null
+            );
             
             // Delete the user
             $employee->delete();
@@ -302,50 +327,13 @@ class EmployeeManagement extends Component
         }
     }
     
-    public function resetPassword($id)
+    public function showCredentials($id)
     {
-        DB::beginTransaction();
-        
-        try {
-            $employee = User::findOrFail($id);
-            
-            // Generate new password
-            $password = $this->userService->generateSecurePassword();
-            $employee->password = bcrypt($password);
-            $employee->save();
-            
-            // Sync with FortiGate
-            $this->fortiGateService->updateUser($employee);
-            
-            // Send new credentials
-            $this->notificationService->sendWelcomeEmail($employee, $password);
-            
-            // Log the action
-            AuditLog::create([
-                'user_id' => auth('admin')->id(),
-                'action' => 'employee.password_reset',
-                'details' => [
-                    'employee_id' => $employee->id,
-                    'email' => $employee->email,
-                ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-            
-            DB::commit();
-            
-            session()->flash('success', __('messages.password_reset_sent'));
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            Log::error('Failed to reset employee password', [
-                'error' => $e->getMessage(),
-                'employee_id' => $id,
-            ]);
-            
-            session()->flash('error', __('messages.password_reset_failed'));
-        }
+        $employee = User::findOrFail($id);
+        $this->displayUsername = $employee->fortigate_username;
+        $this->displayPassword = $employee->fortigate_password;
+        $this->captivePortalUrl = \App\Models\FortiGateSettings::current()->captive_portal_url ?? 'https://192.168.1.1/captive-portal';
+        $this->showCredentialsModal = true;
     }
     
     public function toggleStatus($id)
@@ -361,27 +349,42 @@ class EmployeeManagement extends Component
             
             $employee->status = $newStatus;
             $employee->save();
-            
+
             // Sync with FortiGate
-            if ($newStatus === User::STATUS_SUSPENDED) {
-                $this->fortiGateService->disableUser($employee);
-                $this->notificationService->sendAccountSuspendedEmail($employee);
-            } else {
-                $this->fortiGateService->enableUser($employee);
-                $this->notificationService->sendAccountReactivatedEmail($employee);
+            if ($employee->fortigate_username) {
+                $this->fortiGateService->updateUser(
+                    $employee->fortigate_username,
+                    [
+                        'status' => $newStatus === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    ]
+                );
+
+                // Deauthenticate if suspending
+                if ($newStatus === User::STATUS_SUSPENDED) {
+                    $this->fortiGateService->deauthenticateUser($employee->fortigate_username);
+                    $this->notificationService->sendAccountSuspendedEmail($employee);
+                } else {
+                    $this->notificationService->sendAccountReactivatedEmail($employee);
+                }
             }
             
             // Log the action
-            AuditLog::create([
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
                 'user_id' => auth('admin')->id(),
-                'action' => 'employee.status_changed',
-                'details' => [
-                    'employee_id' => $employee->id,
-                    'old_status' => $employee->getOriginal('status'),
-                    'new_status' => $newStatus,
+                'user_email' => auth('admin')->user()->email,
+                'action' => 'status_changed',
+                'resource_type' => 'employee',
+                'resource_id' => $employee->id,
+                'old_values' => [
+                    'status' => $employee->getOriginal('status'),
                 ],
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
+                'new_values' => [
+                    'status' => $newStatus,
+                ],
+                'status' => AuditLog::STATUS['SUCCESS'],
             ]);
             
             DB::commit();

@@ -24,6 +24,13 @@ class SyncFortiGateUserJob implements ShouldQueue
     public $tries = 3;
 
     /**
+     * The number of seconds the job can run before timing out.
+     *
+     * @var int
+     */
+    public $timeout = 60;
+
+    /**
      * The number of seconds to wait before retrying the job.
      *
      * @var int

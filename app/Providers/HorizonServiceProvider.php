@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\Horizon;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
+use Laravel\Horizon\Events\MasterSupervisorLooped;
 
 class HorizonServiceProvider extends HorizonApplicationServiceProvider
 {
@@ -18,6 +19,12 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
         // Horizon::routeSmsNotificationsTo('15556667777');
         // Horizon::routeMailNotificationsTo('example@example.com');
         // Horizon::routeSlackNotificationsTo('slack-webhook-url', '#channel');
+        
+        // Configure Horizon authorization
+        Horizon::auth(function ($request) {
+            // Check if the user is authenticated as admin
+            return auth()->guard('admin')->check();
+        });
     }
 
     /**
@@ -28,9 +35,23 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     protected function gate(): void
     {
         Gate::define('viewHorizon', function ($user = null) {
-            return in_array(optional($user)->email, [
-                //
-            ]);
+            // Always check for admin authentication, even in local environment
+            // This ensures Horizon is protected at all times
+            
+            // Check if user is authenticated as admin
+            if (!auth()->guard('admin')->check()) {
+                return false;
+            }
+            
+            // Get the authenticated admin user
+            $admin = auth()->guard('admin')->user();
+            
+            // Optional: Restrict to super_admin role only
+            // Uncomment the following line to restrict access to super_admin only
+            // return $admin->role === 'super_admin';
+            
+            // Allow all authenticated admin users
+            return true;
         });
     }
 }

@@ -19,6 +19,8 @@ return [
     'actions' => 'Actions',
     'expired' => 'Expiré',
     'days_remaining' => 'jours restants',
+    'expires_today' => 'Expire aujourd\'hui',
+    'expires_tomorrow' => 'Expire demain',
     
     // Actions
     'edit' => 'Modifier',
@@ -27,6 +29,7 @@ return [
     'activate' => 'Activer',
     'extend' => 'Prolonger',
     'reset_password' => 'Réinitialiser le mot de passe',
+    'show_credentials' => 'Afficher les identifiants',
     
     // Forms
     'create_title' => 'Créer un nouveau consultant',
@@ -43,4 +46,11 @@ return [
     
     // Messages
     'no_consultants' => 'Aucun consultant trouvé',
+
+    // Credentials Modal
+    'credentials_title' => 'Identifiants FortiGate',
+    'credentials_info' => 'Ces identifiants permettent de se connecter au portail captif WiFi.',
+    'captive_portal_url' => 'URL du portail captif',
+    'fortigate_username' => 'Nom d\'utilisateur FortiGate',
+    'fortigate_password' => 'Mot de passe FortiGate',
 ];
