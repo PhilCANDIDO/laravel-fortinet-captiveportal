@@ -40,6 +40,8 @@ class UserService
             
             $user = User::create([
                 'name' => $data['name'],
+                'first_name' => $data['first_name'] ?? null,
+                'last_name' => $data['last_name'] ?? null,
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'user_type' => User::TYPE_EMPLOYEE,
@@ -99,6 +101,8 @@ class UserService
             
             $user = User::create([
                 'name' => $data['name'],
+                'first_name' => $data['first_name'] ?? null,
+                'last_name' => $data['last_name'] ?? null,
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'user_type' => User::TYPE_CONSULTANT,

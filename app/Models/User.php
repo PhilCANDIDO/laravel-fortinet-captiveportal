@@ -40,6 +40,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'fortigate_password',
         'user_type',
         'company_name',
         'department',
