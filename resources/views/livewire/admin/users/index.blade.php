@@ -82,13 +82,13 @@
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                         Activé
                                     </span>
-                                @elseif($user->isInMfaGracePeriod())
+                                @elseif($user->google2fa_secret && $user->isInMfaGracePeriod())
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                                         Période de grâce
                                     </span>
                                 @else
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                        Non configuré
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Désactivé
                                     </span>
                                 @endif
                             </td>
@@ -204,11 +204,41 @@
                                     @error('role') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                                 </div>
 
+                                @if(!$userId)
+                                    <div>
+                                        <label for="password" class="block text-sm font-medium text-gray-700">Mot de passe</label>
+                                        <input wire:model="password" type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                                        <p class="mt-1 text-xs text-gray-500">Minimum 12 caractères</p>
+                                        @error('password') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    <div>
+                                        <label for="password_confirmation" class="block text-sm font-medium text-gray-700">Confirmer le mot de passe</label>
+                                        <input wire:model="password_confirmation" type="password" id="password_confirmation" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
+                                        @error('password_confirmation') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+                                @else
+                                    <div>
+                                        <label for="password" class="block text-sm font-medium text-gray-700">Nouveau mot de passe (optionnel)</label>
+                                        <input wire:model="password" type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <p class="mt-1 text-xs text-gray-500">Laisser vide pour ne pas changer</p>
+                                        @error('password') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                    </div>
+                                @endif
+
                                 <div>
                                     <label class="flex items-center">
                                         <input wire:model="is_active" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                         <span class="ml-2 text-sm text-gray-700">Compte actif</span>
                                     </label>
+                                </div>
+
+                                <div>
+                                    <label class="flex items-center">
+                                        <input wire:model="google2fa_enabled" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        <span class="ml-2 text-sm text-gray-700">Activer MFA (Authentification à 2 facteurs)</span>
+                                    </label>
+                                    <p class="mt-1 ml-6 text-xs text-gray-500">L'utilisateur devra configurer MFA lors de sa première connexion</p>
                                 </div>
                             </div>
                         </div>
@@ -217,7 +247,7 @@
                             <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
                                 {{ $userId ? 'Mettre à jour' : 'Créer' }}
                             </button>
-                            <button type="button" wire:click="$set('showCreateModal', false); $set('showEditModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            <button type="button" wire:click="showEditModal = false; showCreateModal = false; resetFields()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                                 Annuler
                             </button>
                         </div>
