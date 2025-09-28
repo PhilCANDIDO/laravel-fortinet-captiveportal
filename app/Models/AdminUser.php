@@ -126,10 +126,10 @@ class AdminUser extends Authenticatable
     public function setPasswordAttribute($value): void
     {
         // Only hash if the value isn't already hashed
-        if (!Hash::needsRehash($value)) {
-            $this->attributes['password'] = $value;
-        } else {
+        if (Hash::needsRehash($value)) {
             $this->attributes['password'] = Hash::make($value);
+        } else {
+            $this->attributes['password'] = $value;
         }
         
         // Only set timestamps if they're not already set

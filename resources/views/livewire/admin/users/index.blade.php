@@ -50,7 +50,7 @@
         </div>
 
         <!-- Users table -->
-        <div class="overflow-hidden">
+        <div class="overflow-x-auto shadow ring-1 ring-black ring-opacity-5 rounded-lg">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
