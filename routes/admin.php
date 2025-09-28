@@ -56,11 +56,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/employees', \App\Livewire\Admin\EmployeeManagement::class)->name('employees');
         });
         
-        // Audit Logs (placeholder)
+        // Audit Logs
         Route::prefix('audit')->name('audit.')->group(function () {
-            Route::get('/', function() {
-                return view('admin.audit.index');
-            })->name('index');
+            Route::get('/', \App\Livewire\Admin\AuditLogs\Index::class)->name('index');
         });
         
         // Settings
