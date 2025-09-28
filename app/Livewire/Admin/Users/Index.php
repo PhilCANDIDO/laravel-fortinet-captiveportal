@@ -27,7 +27,10 @@ class Index extends Component
     public $email = '';
     public $role = AdminUser::ROLE_ADMIN;
     public $is_active = true;
-    
+    public $password = '';
+    public $password_confirmation = '';
+    public $google2fa_enabled = false;
+
     protected $rules = [
         'name' => 'required|string|max:255',
         'email' => 'required|email|max:255',
@@ -86,77 +89,82 @@ class Index extends Component
         $this->email = $user->email;
         $this->role = $user->role;
         $this->is_active = $user->is_active;
-        
+        $this->google2fa_enabled = $user->google2fa_enabled;
+
         $this->showEditModal = true;
     }
 
     public function saveUser()
     {
-        $this->validate();
-        
         // Only super admins can create/edit users
         if (!auth()->guard('admin')->user()->isSuperAdmin()) {
             session()->flash('error', 'Vous n\'avez pas les permissions nécessaires.');
             return;
         }
-        
+
         if ($this->userId) {
             // Update existing user
+            $this->validate();
+
             $user = AdminUser::findOrFail($this->userId);
-            
+
             // Check for email uniqueness excluding current user
             $emailExists = AdminUser::where('email', $this->email)
                 ->where('id', '!=', $this->userId)
                 ->exists();
-                
+
             if ($emailExists) {
                 $this->addError('email', 'Cet email est déjà utilisé.');
                 return;
             }
-            
-            $user->update([
+
+            $updateData = [
                 'name' => $this->name,
                 'email' => $this->email,
                 'role' => $this->role,
                 'is_active' => $this->is_active,
-            ]);
-            
+                'google2fa_enabled' => $this->google2fa_enabled,
+            ];
+
+            if ($this->password) {
+                $updateData['password'] = $this->password;
+            }
+
+            $user->update($updateData);
+
             AuditService::log('admin_user_updated', 'admin', [
                 'admin_id' => $user->id,
                 'changes' => $user->getChanges(),
             ]);
-            
+
             session()->flash('message', 'Utilisateur mis à jour avec succès.');
         } else {
-            // Create new user
-            $emailExists = AdminUser::where('email', $this->email)->exists();
-            
-            if ($emailExists) {
-                $this->addError('email', 'Cet email est déjà utilisé.');
-                return;
-            }
-            
-            $temporaryPassword = 'Temp@' . str()->random(12) . '123!';
-            
+            // Create new user - validate password is required
+            $this->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:admin_users,email',
+                'role' => 'required|in:admin,super_admin',
+                'password' => 'required|min:12|confirmed',
+            ]);
+
             $user = AdminUser::create([
                 'name' => $this->name,
                 'email' => $this->email,
                 'role' => $this->role,
-                'password' => $temporaryPassword,
+                'password' => $this->password,
                 'is_active' => $this->is_active,
+                'google2fa_enabled' => $this->google2fa_enabled,
                 'email_verified_at' => now(),
             ]);
-            
+
             AuditService::log('admin_user_created', 'admin', [
                 'admin_id' => $user->id,
                 'email' => $user->email,
             ]);
-            
-            // TODO: Send welcome email with temporary password
-            
-            session()->flash('message', 'Utilisateur créé avec succès. Un email avec le mot de passe temporaire a été envoyé.');
+
+            session()->flash('message', 'Utilisateur créé avec succès.');
         }
-        
+
         $this->showCreateModal = false;
         $this->showEditModal = false;
         $this->resetFields();
@@ -281,13 +289,16 @@ class Index extends Component
         $this->confirmingUserDeletion = false;
     }
 
-    private function resetFields()
+    public function resetFields()
     {
         $this->userId = null;
         $this->name = '';
         $this->email = '';
         $this->role = AdminUser::ROLE_ADMIN;
         $this->is_active = true;
+        $this->password = '';
+        $this->password_confirmation = '';
+        $this->google2fa_enabled = false;
         $this->resetErrorBag();
     }
 }
