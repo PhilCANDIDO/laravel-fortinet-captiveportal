@@ -39,4 +39,10 @@ return [
     'password_changed_successfully' => 'Password modificata con successo.',
     'extend_session' => 'Estendi Sessione',
     'session_warning_message' => 'La tua sessione scadrà tra',
+    'force_logout_other_sessions' => 'Forza disconnessione altre sessioni',
+    'force_logout_title' => 'Forza Disconnessione',
+    'force_logout_description' => 'Per forzare la disconnessione di tutte le altre sessioni attive, conferma la tua identità inserendo le tue credenziali.',
+    'force_logout_button' => 'Disconnetti Tutte le Sessioni',
+    'all_sessions_logged_out' => 'Tutte le sessioni sono state disconnesse. Ora puoi accedere nuovamente.',
+    'invalid_credentials' => 'Credenziali non valide.',
 ];

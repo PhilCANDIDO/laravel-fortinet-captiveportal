@@ -12,7 +12,10 @@ class Login extends Component
     public $email = '';
     public $password = '';
     public $remember = false;
-    
+    public $showForceLogoutModal = false;
+    public $forceLogoutEmail = '';
+    public $forceLogoutPassword = '';
+
     protected $rules = [
         'email' => 'required|email',
         'password' => 'required',
@@ -80,7 +83,48 @@ class Login extends Component
         
         $this->addError('email', 'The provided credentials do not match our records.');
     }
-    
+
+    public function openForceLogoutModal()
+    {
+        $this->showForceLogoutModal = true;
+    }
+
+    public function forceLogout(AuditService $auditService)
+    {
+        $this->validate([
+            'forceLogoutEmail' => 'required|email',
+            'forceLogoutPassword' => 'required',
+        ]);
+
+        if (Auth::guard('admin')->attempt(['email' => $this->forceLogoutEmail, 'password' => $this->forceLogoutPassword], false)) {
+            $user = Auth::guard('admin')->user();
+
+            \App\Models\AdminSession::where('admin_user_id', $user->id)
+                ->where('is_active', true)
+                ->update(['is_active' => false]);
+
+            Auth::guard('admin')->logout();
+
+            $auditService->log(
+                'force_logout',
+                "Admin forced logout of all sessions: {$user->email}",
+                [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'ip_address' => request()->ip(),
+                ]
+            );
+
+            session()->flash('success', __('auth.all_sessions_logged_out'));
+
+            $this->showForceLogoutModal = false;
+            $this->forceLogoutEmail = '';
+            $this->forceLogoutPassword = '';
+        } else {
+            $this->addError('forceLogoutEmail', __('auth.invalid_credentials'));
+        }
+    }
+
     public function render()
     {
         return view('livewire.admin.auth.login')

@@ -5,8 +5,22 @@
     <form wire:submit.prevent="login">
         <!-- Session Status -->
         @if (session()->has('warning'))
-            <div class="mb-4 font-medium text-sm text-yellow-600" role="alert" aria-live="polite">
-                {{ session('warning') }}
+            <div class="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded" role="alert" aria-live="polite">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <p class="text-sm text-yellow-700">
+                            {{ session('warning') }}
+                        </p>
+                        <button type="button" wire:click="openForceLogoutModal" class="mt-2 text-sm font-medium text-yellow-800 hover:text-yellow-900 underline">
+                            {{ __('auth.force_logout_other_sessions') }}
+                        </button>
+                    </div>
+                </div>
             </div>
         @endif
 
@@ -82,5 +96,47 @@
             </button>
         </div>
     </form>
+
+    <!-- Force Logout Modal -->
+    @if ($showForceLogoutModal)
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">{{ __('auth.force_logout_title') }}</h3>
+
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 mb-4">{{ __('auth.force_logout_description') }}</p>
+                </div>
+
+                <form wire:submit.prevent="forceLogout">
+                    <div class="mb-4">
+                        <label for="forceLogoutEmail" class="block text-sm font-medium text-gray-700 mb-1">{{ __('auth.email') }}</label>
+                        <input wire:model="forceLogoutEmail" id="forceLogoutEmail" type="email" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                        @error('forceLogoutEmail')
+                            <span class="text-red-600 text-sm mt-1">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="forceLogoutPassword" class="block text-sm font-medium text-gray-700 mb-1">{{ __('auth.password') }}</label>
+                        <input wire:model="forceLogoutPassword" id="forceLogoutPassword" type="password" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                        @error('forceLogoutPassword')
+                            <span class="text-red-600 text-sm mt-1">{{ $message }}</span>
+                        @enderror
+                    </div>
+
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" wire:click="$set('showForceLogoutModal', false)" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                            {{ __('common.cancel') }}
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                            {{ __('auth.force_logout_button') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
     </div>
 </div>
