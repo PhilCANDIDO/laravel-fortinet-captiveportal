@@ -77,7 +77,9 @@ class GuestRegistrationController extends Controller
             }
         }
         
-        return view('guest.register', compact('portalInfo'));
+        $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
+
+        return view('guest.register', compact('portalInfo', 'emailValidationEnabled'));
     }
     
     /**
