@@ -113,6 +113,7 @@
                         </div>
                         
                         <!-- Validation Notice -->
+                        @if($emailValidationEnabled ?? true)
                         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <div class="flex">
                                 <div class="flex-shrink-0">
@@ -130,6 +131,7 @@
                                 </div>
                             </div>
                         </div>
+                        @endif
                         
                         <!-- Submit Button -->
                         <div>
