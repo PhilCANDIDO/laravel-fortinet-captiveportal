@@ -153,15 +153,31 @@ class UserService
     public function createGuest(array $data): User
     {
         DB::beginTransaction();
-        
+
         try {
             // Check for duplicate email
             $existingUser = User::where('email', $data['email'])
                 ->where('user_type', User::TYPE_GUEST)
                 ->first();
-                
+
             if ($existingUser) {
-                throw new \Exception('Email already registered');
+                // If the existing guest has expired, delete it and allow re-registration
+                if ($existingUser->isExpired() || $existingUser->status === User::STATUS_EXPIRED) {
+                    Log::info('Auto-cleanup: Deleting expired guest to allow re-registration', [
+                        'user_id' => $existingUser->id,
+                        'email' => $existingUser->email,
+                        'expired_at' => $existingUser->expires_at,
+                    ]);
+
+                    // Delete the expired guest (includes FortiGate removal)
+                    $this->deleteUser($existingUser);
+
+                    // Continue with new registration below
+                } else {
+                    // Guest is still active or pending validation
+                    $remainingTime = $existingUser->expires_at ? $existingUser->expires_at->diffForHumans() : __('common.unknown');
+                    throw new \Exception(__('messages.guest_email_already_exists', ['time' => $remainingTime]));
+                }
             }
             
             // Generate secure password

@@ -36,7 +36,8 @@ return [
     // Info messages
     'import_feature_coming_soon' => 'Import feature coming soon.',
     'export_feature_coming_soon' => 'Export feature coming soon.',
-    
+    'guest_email_already_exists' => 'An active guest account with this email already exists. It will expire :time.',
+
     // Validation
     'validation.errors_occurred' => 'Errors occurred',
 ];

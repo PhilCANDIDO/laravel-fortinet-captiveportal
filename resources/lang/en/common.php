@@ -33,4 +33,5 @@ return [
     'view_details' => 'View Details',
     'no_results' => 'No results found',
     'message' => 'Message',
+    'unknown' => 'unknown',
 ];
