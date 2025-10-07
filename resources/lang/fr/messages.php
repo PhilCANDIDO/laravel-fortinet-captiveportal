@@ -32,7 +32,8 @@ return [
     'status_change_failed' => 'Erreur lors du changement de statut.',
     
     'registration_failed' => 'Erreur lors de l\'inscription. Veuillez réessayer.',
-    
+    'guest_email_already_exists' => 'Un compte invité actif avec cet email existe déjà. Il expirera :time.',
+
     // Info messages
     'import_feature_coming_soon' => 'La fonctionnalité d\'import sera bientôt disponible.',
     'export_feature_coming_soon' => 'La fonctionnalité d\'export sera bientôt disponible.',

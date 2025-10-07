@@ -30,12 +30,38 @@ class GuestUserService
      */
     public function createGuestWithPortalData(array $userData, ?array $portalData = null): User
     {
+        // Check for duplicate email and handle expired guests
+        $existingUser = User::where('email', $userData['email'])
+            ->where('user_type', User::TYPE_GUEST)
+            ->first();
+
+        if ($existingUser) {
+            // If the existing guest has expired, delete it and allow re-registration
+            if ($existingUser->isExpired() || $existingUser->status === User::STATUS_EXPIRED) {
+                Log::info('Auto-cleanup: Deleting expired guest to allow re-registration', [
+                    'user_id' => $existingUser->id,
+                    'email' => $existingUser->email,
+                    'expired_at' => $existingUser->expires_at,
+                ]);
+
+                // Delete the expired guest (includes FortiGate removal)
+                $existingUser->removeFromFortiGate();
+                $existingUser->delete();
+
+                // Continue with new registration below
+            } else {
+                // Guest is still active or pending validation
+                $remainingTime = $existingUser->expires_at ? $existingUser->expires_at->diffForHumans() : __('common.unknown');
+                throw new \Exception(__('messages.guest_email_already_exists', ['time' => $remainingTime]));
+            }
+        }
+
         // Generate a secure password
         $password = $this->generateSecurePassword();
-        
+
         // Check if email validation is enabled
         $emailValidationEnabled = \App\Models\Setting::isGuestEmailValidationEnabled();
-        
+
         // Create the user
         $user = new User();
         $user->name = $userData['first_name'] . ' ' . $userData['last_name'];
