@@ -23,7 +23,11 @@ return [
     'consultant_update_failed' => 'Erreur lors de la mise à jour du consultant.',
     'consultant_deletion_failed' => 'Erreur lors de la suppression du consultant.',
     'consultant_extension_failed' => 'Erreur lors de la prolongation du consultant.',
-    
+    'consultant_recreated_on_fortigate' => 'Le consultant a été recréé avec succès sur FortiGate.',
+    'consultant_recreation_failed' => 'Erreur lors de la recréation du consultant sur FortiGate',
+    'cannot_recreate_expired_user' => 'Impossible de recréer un utilisateur expiré sur FortiGate.',
+    'user_already_exists_on_fortigate' => 'L\'utilisateur existe déjà sur FortiGate.',
+
     'employee_creation_failed' => 'Erreur lors de la création de l\'employé.',
     'employee_update_failed' => 'Erreur lors de la mise à jour de l\'employé.',
     'employee_deletion_failed' => 'Erreur lors de la suppression de l\'employé.',

@@ -384,14 +384,14 @@ class ConsultantManagement extends Component
     public function toggleStatus($id)
     {
         DB::beginTransaction();
-        
+
         try {
             $consultant = User::findOrFail($id);
-            
-            $newStatus = $consultant->status === User::STATUS_ACTIVE 
-                ? User::STATUS_SUSPENDED 
+
+            $newStatus = $consultant->status === User::STATUS_ACTIVE
+                ? User::STATUS_SUSPENDED
                 : User::STATUS_ACTIVE;
-            
+
             $consultant->status = $newStatus;
             $consultant->save();
 
@@ -412,7 +412,7 @@ class ConsultantManagement extends Component
                     $this->notificationService->sendAccountReactivatedEmail($consultant);
                 }
             }
-            
+
             // Log the action
             AuditLog::log([
                 'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
@@ -431,24 +431,117 @@ class ConsultantManagement extends Component
                 ],
                 'status' => AuditLog::STATUS['SUCCESS'],
             ]);
-            
+
             DB::commit();
-            
-            $message = $newStatus === User::STATUS_SUSPENDED 
+
+            $message = $newStatus === User::STATUS_SUSPENDED
                 ? __('messages.consultant_suspended')
                 : __('messages.consultant_activated');
-            
+
             session()->flash('success', $message);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             Log::error('Failed to toggle consultant status', [
                 'error' => $e->getMessage(),
                 'consultant_id' => $id,
             ]);
-            
+
             session()->flash('error', __('messages.status_change_failed'));
+        }
+    }
+
+    public function recreateOnFortiGate($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $consultant = User::findOrFail($id);
+
+            // Check if consultant is expired
+            if ($consultant->isExpired()) {
+                session()->flash('error', __('messages.cannot_recreate_expired_user'));
+                return;
+            }
+
+            // Check if user already exists on FortiGate
+            if ($consultant->fortigate_username && $this->fortiGateService->userExists($consultant->fortigate_username)) {
+                session()->flash('error', __('messages.user_already_exists_on_fortigate'));
+                return;
+            }
+
+            // Generate new password if not exists
+            if (!$consultant->fortigate_password) {
+                $password = $this->userService->generateSecurePassword();
+                $consultant->fortigate_password = $password;
+                $consultant->save();
+            } else {
+                $password = $consultant->fortigate_password;
+            }
+
+            // Create user on FortiGate
+            $this->fortiGateService->createUser([
+                'username' => $consultant->fortigate_username,
+                'password' => $password,
+                'email' => $consultant->email,
+                'status' => $consultant->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                'expires_at' => $consultant->expires_at ? $consultant->expires_at->format('Y-m-d') : null,
+            ]);
+
+            // Update sync status
+            $consultant->updateFortiGateSync(User::SYNC_SYNCED);
+
+            // Log the action
+            AuditLog::log([
+                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                'user_type' => 'admin',
+                'user_id' => auth('admin')->id(),
+                'user_email' => auth('admin')->user()->email,
+                'action' => 'recreated_on_fortigate',
+                'resource_type' => 'consultant',
+                'resource_id' => $consultant->id,
+                'new_values' => [
+                    'fortigate_username' => $consultant->fortigate_username,
+                ],
+                'status' => AuditLog::STATUS['SUCCESS'],
+            ]);
+
+            DB::commit();
+
+            session()->flash('success', __('messages.consultant_recreated_on_fortigate'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Failed to recreate consultant on FortiGate', [
+                'error' => $e->getMessage(),
+                'consultant_id' => $id,
+            ]);
+
+            session()->flash('error', __('messages.consultant_recreation_failed') . ': ' . $e->getMessage());
+        }
+    }
+
+    public function checkFortiGateStatus($id)
+    {
+        try {
+            $consultant = User::findOrFail($id);
+
+            if (!$consultant->fortigate_username) {
+                return false;
+            }
+
+            return $this->fortiGateService->userExists($consultant->fortigate_username);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to check FortiGate status', [
+                'error' => $e->getMessage(),
+                'consultant_id' => $id,
+            ]);
+
+            return null; // null means error checking
         }
     }
     
