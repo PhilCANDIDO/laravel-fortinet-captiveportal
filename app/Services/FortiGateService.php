@@ -608,10 +608,21 @@ class FortiGateService
                 $lastException = $e;
                 $attempts++;
 
-                // Don't retry for 404 errors - they are expected when resource doesn't exist
-                // Also don't count them as failures for circuit breaker
-                if ($e instanceof FortiGateApiException && $e->getHttpStatusCode() === 404) {
-                    throw $e;
+                // Don't retry for certain errors that won't succeed on retry
+                if ($e instanceof FortiGateApiException) {
+                    $statusCode = $e->getHttpStatusCode();
+                    $apiResponse = $e->getApiResponse();
+
+                    // 404 = Resource not found (expected when checking if user exists)
+                    if ($statusCode === 404) {
+                        throw $e;
+                    }
+
+                    // Error -5 = Duplicate entry (user already exists)
+                    // Don't retry, just fail immediately
+                    if (isset($apiResponse['error']) && $apiResponse['error'] == -5) {
+                        throw $e;
+                    }
                 }
 
                 if ($attempts < $this->config['retry']['max_attempts']) {

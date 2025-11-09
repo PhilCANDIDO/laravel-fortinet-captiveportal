@@ -20,6 +20,9 @@ class ConsultantManagement extends Component
     public $showEditModal = false;
     public $showDeleteModal = false;
     public $showCredentialsModal = false;
+
+    // Loading states
+    public $recreatingUserId = null;
     
     public $search = '';
     public $statusFilter = '';
@@ -454,6 +457,9 @@ class ConsultantManagement extends Component
 
     public function recreateOnFortiGate($id)
     {
+        // Set loading state
+        $this->recreatingUserId = $id;
+
         DB::beginTransaction();
 
         try {
@@ -461,6 +467,7 @@ class ConsultantManagement extends Component
 
             // Check if consultant is expired
             if ($consultant->isExpired()) {
+                $this->recreatingUserId = null;
                 session()->flash('error', __('messages.cannot_recreate_expired_user'));
                 return;
             }
@@ -506,23 +513,24 @@ class ConsultantManagement extends Component
 
                 DB::commit();
 
+                $this->recreatingUserId = null;
                 session()->flash('success', __('messages.consultant_recreated_on_fortigate'));
 
             } catch (\App\Exceptions\FortiGateApiException $e) {
                 DB::rollBack();
+                $this->recreatingUserId = null;
 
                 // Check if error is because user already exists
                 $errorMessage = $e->getMessage();
                 $apiResponse = $e->getApiResponse();
 
-                // FortiGate returns error when user already exists
-                // Check for common error messages or status codes
+                // FortiGate returns error -5 when user already exists
+                // Check for common error messages or error code -5
                 if (stripos($errorMessage, 'already exist') !== false ||
                     stripos($errorMessage, 'duplicate') !== false ||
-                    (isset($apiResponse['status']) && $apiResponse['status'] === 'error' &&
-                     isset($apiResponse['error']) && $apiResponse['error'] == -2)) {
+                    (isset($apiResponse['error']) && $apiResponse['error'] == -5)) {
 
-                    session()->flash('error', __('messages.user_already_exists_on_fortigate'));
+                    session()->flash('warning', __('messages.user_already_exists_on_fortigate'));
                 } else {
                     Log::error('Failed to recreate consultant on FortiGate', [
                         'error' => $e->getMessage(),
@@ -536,6 +544,7 @@ class ConsultantManagement extends Component
 
         } catch (\Exception $e) {
             DB::rollBack();
+            $this->recreatingUserId = null;
 
             Log::error('Failed to recreate consultant on FortiGate', [
                 'error' => $e->getMessage(),
