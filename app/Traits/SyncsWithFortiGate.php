@@ -15,11 +15,12 @@ trait SyncsWithFortiGate
     {
         try {
             $fortiGateService = app(FortiGateService::class);
-            
+
             // Prepare user data for FortiGate
+            // Use fortigate_password (plain text), not password (bcrypt hash)
             $userData = [
                 'username' => $this->fortigate_username,
-                'password' => $this->password ?? $this->generateSecurePassword(),
+                'password' => $this->fortigate_password ?? $this->generateSecurePassword(),
                 'email' => $this->email,
                 'expires_at' => $this->expires_at ? $this->expires_at->format('Y-m-d H:i:s') : null,
             ];
