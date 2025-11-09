@@ -465,12 +465,6 @@ class ConsultantManagement extends Component
                 return;
             }
 
-            // Check if user already exists on FortiGate
-            if ($consultant->fortigate_username && $this->fortiGateService->userExists($consultant->fortigate_username)) {
-                session()->flash('error', __('messages.user_already_exists_on_fortigate'));
-                return;
-            }
-
             // Generate new password if not exists
             if (!$consultant->fortigate_password) {
                 $password = $this->userService->generateSecurePassword();
@@ -480,37 +474,65 @@ class ConsultantManagement extends Component
                 $password = $consultant->fortigate_password;
             }
 
-            // Create user on FortiGate
-            $this->fortiGateService->createUser([
-                'username' => $consultant->fortigate_username,
-                'password' => $password,
-                'email' => $consultant->email,
-                'status' => $consultant->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
-                'expires_at' => $consultant->expires_at ? $consultant->expires_at->format('Y-m-d') : null,
-            ]);
+            // Try to create user on FortiGate
+            // If user already exists, FortiGate will return an error
+            try {
+                $this->fortiGateService->createUser([
+                    'username' => $consultant->fortigate_username,
+                    'password' => $password,
+                    'email' => $consultant->email,
+                    'status' => $consultant->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    'expires_at' => $consultant->expires_at ? $consultant->expires_at->format('Y-m-d') : null,
+                ]);
 
-            // Update sync status
-            $consultant->updateFortiGateSync(User::SYNC_SYNCED);
+                // Update sync status
+                $consultant->updateFortiGateSync(User::SYNC_SYNCED);
 
-            // Log the action
-            AuditLog::log([
-                'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
-                'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
-                'user_type' => 'admin',
-                'user_id' => auth('admin')->id(),
-                'user_email' => auth('admin')->user()->email,
-                'action' => 'recreated_on_fortigate',
-                'resource_type' => 'consultant',
-                'resource_id' => $consultant->id,
-                'new_values' => [
-                    'fortigate_username' => $consultant->fortigate_username,
-                ],
-                'status' => AuditLog::STATUS['SUCCESS'],
-            ]);
+                // Log the action
+                AuditLog::log([
+                    'event_type' => AuditLog::EVENT_TYPES['USER_UPDATED'],
+                    'event_category' => AuditLog::EVENT_CATEGORIES['USER_MANAGEMENT'],
+                    'user_type' => 'admin',
+                    'user_id' => auth('admin')->id(),
+                    'user_email' => auth('admin')->user()->email,
+                    'action' => 'recreated_on_fortigate',
+                    'resource_type' => 'consultant',
+                    'resource_id' => $consultant->id,
+                    'new_values' => [
+                        'fortigate_username' => $consultant->fortigate_username,
+                    ],
+                    'status' => AuditLog::STATUS['SUCCESS'],
+                ]);
 
-            DB::commit();
+                DB::commit();
 
-            session()->flash('success', __('messages.consultant_recreated_on_fortigate'));
+                session()->flash('success', __('messages.consultant_recreated_on_fortigate'));
+
+            } catch (\App\Exceptions\FortiGateApiException $e) {
+                DB::rollBack();
+
+                // Check if error is because user already exists
+                $errorMessage = $e->getMessage();
+                $apiResponse = $e->getApiResponse();
+
+                // FortiGate returns error when user already exists
+                // Check for common error messages or status codes
+                if (stripos($errorMessage, 'already exist') !== false ||
+                    stripos($errorMessage, 'duplicate') !== false ||
+                    (isset($apiResponse['status']) && $apiResponse['status'] === 'error' &&
+                     isset($apiResponse['error']) && $apiResponse['error'] == -2)) {
+
+                    session()->flash('error', __('messages.user_already_exists_on_fortigate'));
+                } else {
+                    Log::error('Failed to recreate consultant on FortiGate', [
+                        'error' => $e->getMessage(),
+                        'consultant_id' => $id,
+                        'api_response' => $apiResponse,
+                    ]);
+
+                    session()->flash('error', __('messages.consultant_recreation_failed') . ': ' . $errorMessage);
+                }
+            }
 
         } catch (\Exception $e) {
             DB::rollBack();
