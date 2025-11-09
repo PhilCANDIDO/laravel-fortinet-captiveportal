@@ -87,27 +87,28 @@ trait SyncsWithFortiGate
     {
         // User should be in FortiGate if:
         // 1. They are active
-        // 2. They have accepted the charter (or are employees who don't need to)
+        // 2. They have accepted the charter (or are employees/consultants who don't need to)
         // 3. They are validated (for guests)
         // 4. They are not expired
-        
+
         if (!$this->is_active || $this->status === User::STATUS_DELETED) {
             return false;
         }
-        
+
         if ($this->isExpired()) {
             return false;
         }
-        
+
         if ($this->isGuest() && !$this->validated_at) {
             return false;
         }
-        
-        // Employees don't need charter acceptance, others do
-        if (!$this->isEmployee() && !$this->hasAcceptedCharter()) {
+
+        // Only guests need charter acceptance before FortiGate creation
+        // Employees and consultants are created by admins and don't need charter
+        if ($this->isGuest() && !$this->hasAcceptedCharter()) {
             return false;
         }
-        
+
         return true;
     }
     
