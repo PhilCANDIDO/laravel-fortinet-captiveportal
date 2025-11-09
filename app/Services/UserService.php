@@ -549,8 +549,8 @@ class UserService
      */
     public function cleanupUnvalidatedGuests(): int
     {
-        $unvalidatedGuests = User::validationExpired()
-                                  ->whereNull('validated_at')
+        $unvalidatedGuests = User::where('user_type', User::TYPE_GUEST)
+                                  ->validationExpired()
                                   ->get();
         
         $count = 0;
