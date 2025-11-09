@@ -11,7 +11,13 @@
             {{ session('success') }}
         </div>
     @endif
-    
+
+    @if (session()->has('warning'))
+        <div class="mb-4 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
+            {{ session('warning') }}
+        </div>
+    @endif
+
     @if (session()->has('error'))
         <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
             {{ session('error') }}
@@ -161,11 +167,19 @@
                             <div class="flex justify-end space-x-2">
                                 @if (!$consultant->isExpired())
                                     <button wire:click="recreateOnFortiGate({{ $consultant->id }})"
-                                            class="text-purple-600 hover:text-purple-900"
+                                            wire:loading.attr="disabled"
+                                            wire:target="recreateOnFortiGate({{ $consultant->id }})"
+                                            class="text-purple-600 hover:text-purple-900 disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Recreate on FortiGate">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                        </svg>
+                                        @if ($recreatingUserId === $consultant->id)
+                                            <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                        @else
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                        @endif
                                     </button>
                                 @endif
 
