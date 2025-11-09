@@ -107,6 +107,10 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse ($consultants as $consultant)
+                    @php
+                        // Check FortiGate status once per consultant to avoid multiple API calls
+                        $existsOnFortiGate = $this->checkFortiGateStatus($consultant->id);
+                    @endphp
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm font-medium text-gray-900">
@@ -161,9 +165,6 @@
                             @endif
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            @php
-                                $existsOnFortiGate = $this->checkFortiGateStatus($consultant->id);
-                            @endphp
                             @if ($existsOnFortiGate === true)
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -189,10 +190,6 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div class="flex justify-end space-x-2">
-                                @php
-                                    $existsOnFortiGate = $this->checkFortiGateStatus($consultant->id);
-                                @endphp
-
                                 @if ($existsOnFortiGate === false && !$consultant->isExpired())
                                     <button wire:click="recreateOnFortiGate({{ $consultant->id }})"
                                             class="text-purple-600 hover:text-purple-900"
