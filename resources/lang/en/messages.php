@@ -23,7 +23,11 @@ return [
     'consultant_update_failed' => 'Error updating consultant.',
     'consultant_deletion_failed' => 'Error deleting consultant.',
     'consultant_extension_failed' => 'Error extending consultant access.',
-    
+    'consultant_recreated_on_fortigate' => 'Consultant successfully recreated on FortiGate.',
+    'consultant_recreation_failed' => 'Error recreating consultant on FortiGate',
+    'cannot_recreate_expired_user' => 'Cannot recreate an expired user on FortiGate.',
+    'user_already_exists_on_fortigate' => 'User already exists on FortiGate.',
+
     'employee_creation_failed' => 'Error creating employee.',
     'employee_update_failed' => 'Error updating employee.',
     'employee_deletion_failed' => 'Error deleting employee.',
