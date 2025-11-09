@@ -41,6 +41,9 @@ class ConsultantManagement extends Component
     public $displayUsername;
     public $displayPassword;
     public $captivePortalUrl;
+
+    // Cache for FortiGate status checks to avoid duplicate API calls
+    protected $fortiGateStatusCache = [];
     
     protected $rules = [
         'first_name' => 'required|string|max:100',
@@ -526,14 +529,23 @@ class ConsultantManagement extends Component
 
     public function checkFortiGateStatus($id)
     {
+        // Return cached result if available to avoid duplicate API calls
+        if (isset($this->fortiGateStatusCache[$id])) {
+            return $this->fortiGateStatusCache[$id];
+        }
+
         try {
             $consultant = User::findOrFail($id);
 
             if (!$consultant->fortigate_username) {
+                $this->fortiGateStatusCache[$id] = false;
                 return false;
             }
 
-            return $this->fortiGateService->userExists($consultant->fortigate_username);
+            $exists = $this->fortiGateService->userExists($consultant->fortigate_username);
+            $this->fortiGateStatusCache[$id] = $exists;
+
+            return $exists;
 
         } catch (\Exception $e) {
             Log::error('Failed to check FortiGate status', [
@@ -541,6 +553,7 @@ class ConsultantManagement extends Component
                 'consultant_id' => $id,
             ]);
 
+            $this->fortiGateStatusCache[$id] = null;
             return null; // null means error checking
         }
     }

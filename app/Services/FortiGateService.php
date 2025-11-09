@@ -599,32 +599,38 @@ class FortiGateService
         while ($attempts < $this->config['retry']['max_attempts']) {
             try {
                 $response = $this->executeRequest($method, $url, $data);
-                
+
                 $this->recordSuccess(microtime(true) - $startTime);
-                
+
                 return $this->handleResponse($response, $endpoint);
-                
+
             } catch (Exception $e) {
                 $lastException = $e;
                 $attempts++;
-                
+
+                // Don't retry for 404 errors - they are expected when resource doesn't exist
+                // Also don't count them as failures for circuit breaker
+                if ($e instanceof FortiGateApiException && $e->getHttpStatusCode() === 404) {
+                    throw $e;
+                }
+
                 if ($attempts < $this->config['retry']['max_attempts']) {
                     $delay = $this->calculateRetryDelay($attempts);
-                    
+
                     Log::warning('FortiGate API request failed, retrying', [
                         'attempt' => $attempts,
                         'delay' => $delay,
                         'endpoint' => $endpoint,
                         'error' => $e->getMessage(),
                     ]);
-                    
+
                     usleep($delay * 1000);
                 }
             }
         }
 
         $this->recordFailure(microtime(true) - $startTime);
-        
+
         throw $lastException ?? new FortiGateApiException('Request failed after all retries');
     }
 
