@@ -568,27 +568,78 @@ class UserService
     }
     
     /**
-     * Sync all pending users with FortiGate
+     * Sync all pending users with FortiGate using batch approach
      */
     public function syncPendingUsers(): int
     {
         if (!$this->fortiGateService->isConfigured()) {
             return 0;
         }
-        
+
+        // Get all FortiGate users in one API call (efficient)
+        try {
+            $fortiGateUsers = $this->fortiGateService->getAllUsers();
+            $fortiGateUsernames = collect($fortiGateUsers)->pluck('name')->toArray();
+
+            Log::debug('Fetched FortiGate users', [
+                'count' => count($fortiGateUsernames),
+                'usernames' => $fortiGateUsernames
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch FortiGate users list', [
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+
         $pendingUsers = User::needingSync()->get();
         $count = 0;
-        
+        $mismatches = 0;
+
         foreach ($pendingUsers as $user) {
-            if ($user->syncWithFortiGate()) {
-                $count++;
+            $existsInFortiGate = in_array($user->fortigate_username, $fortiGateUsernames);
+
+            // Check if user should be in FortiGate
+            if ($user->shouldBeInFortiGate()) {
+                if ($existsInFortiGate) {
+                    // User exists, update it
+                    if ($user->syncWithFortiGate()) {
+                        $count++;
+                    }
+                } else {
+                    // User missing from FortiGate, mark as mismatch
+                    $user->updateFortiGateSync(User::SYNC_ERROR, 'User missing from FortiGate');
+                    $mismatches++;
+
+                    Log::warning('User missing from FortiGate', [
+                        'user_id' => $user->id,
+                        'fortigate_username' => $user->fortigate_username,
+                        'user_type' => $user->user_type,
+                        'status' => $user->status
+                    ]);
+                }
+            } else {
+                // User should NOT be in FortiGate
+                if ($existsInFortiGate) {
+                    // User exists but shouldn't, remove it
+                    if ($user->syncWithFortiGate()) {
+                        $count++;
+                    }
+                } else {
+                    // User doesn't exist and shouldn't, mark as synced
+                    $user->updateFortiGateSync(User::SYNC_NOT_REQUIRED);
+                }
             }
         }
-        
+
         if ($count > 0) {
             Log::info("Synced {$count} users with FortiGate");
         }
-        
+
+        if ($mismatches > 0) {
+            Log::warning("Found {$mismatches} users missing from FortiGate (marked as SYNC_ERROR)");
+        }
+
         return $count;
     }
     
