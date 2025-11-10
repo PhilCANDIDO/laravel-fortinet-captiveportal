@@ -33,19 +33,26 @@ class ExpireUsersJob implements ShouldQueue
      */
     public function handle(UserService $userService): void
     {
+        Log::info('===== JOB STARTED: ExpireUsersJob =====');
         Log::info('Starting user expiration check');
-        
+
         $count = $userService->handleExpiredUsers();
-        
+
         if ($count > 0) {
             Log::info("Expired {$count} user accounts");
+        } else {
+            Log::info('No users to expire');
         }
-        
+
         // Also cleanup unvalidated guests
         $guestCount = $userService->cleanupUnvalidatedGuests();
-        
+
         if ($guestCount > 0) {
             Log::info("Cleaned up {$guestCount} unvalidated guest accounts");
+        } else {
+            Log::info('No unvalidated guests to clean up');
         }
+
+        Log::info('===== JOB FINISHED: ExpireUsersJob =====');
     }
 }

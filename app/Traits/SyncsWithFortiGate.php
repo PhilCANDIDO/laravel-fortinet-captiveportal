@@ -16,25 +16,36 @@ trait SyncsWithFortiGate
         try {
             $fortiGateService = app(FortiGateService::class);
 
-            // Prepare user data for FortiGate
-            // Use fortigate_password (plain text), not password (bcrypt hash)
-            $userData = [
-                'username' => $this->fortigate_username,
-                'password' => $this->fortigate_password ?? $this->generateSecurePassword(),
-                'email' => $this->email,
-                'expires_at' => $this->expires_at ? $this->expires_at->format('Y-m-d H:i:s') : null,
-            ];
-            
             // Check if user exists in FortiGate
             $existsInFortiGate = $fortiGateService->userExists($this->fortigate_username);
-            
+
             if ($this->shouldBeInFortiGate()) {
                 if ($existsInFortiGate) {
-                    // Update existing user
-                    $result = $fortiGateService->updateUser($this->fortigate_username, $userData);
+                    // Update existing user - DON'T send password (FortiGate rejects it with 403)
+                    $updateData = [
+                        'email-to' => $this->email,
+                    ];
+
+                    // Only add expiry date if user has one
+                    if ($this->expires_at) {
+                        $updateData['expiry-date'] = $this->expires_at->format('Y-m-d');
+                    }
+
+                    $result = $fortiGateService->updateUser($this->fortigate_username, $updateData);
                 } else {
-                    // Create new user
-                    $result = $fortiGateService->createUser($userData);
+                    // Create new user - password required
+                    $createData = [
+                        'username' => $this->fortigate_username,
+                        'password' => $this->fortigate_password ?? $this->generateSecurePassword(),
+                        'email' => $this->email,
+                        'status' => $this->status === User::STATUS_ACTIVE ? 'enable' : 'disable',
+                    ];
+
+                    if ($this->expires_at) {
+                        $createData['expires_at'] = $this->expires_at->format('Y-m-d');
+                    }
+
+                    $result = $fortiGateService->createUser($createData);
                 }
                 
                 // Enable or disable based on status
@@ -57,14 +68,28 @@ trait SyncsWithFortiGate
             } else {
                 // User should not be in FortiGate (deleted, expired, etc.)
                 if ($existsInFortiGate) {
+                    // Delete from FortiGate
                     $fortiGateService->deleteUser($this->fortigate_username);
-                    
+
                     Log::info('User removed from FortiGate', [
                         'user_id' => $this->id,
                         'fortigate_username' => $this->fortigate_username,
+                        'reason' => $this->isExpired() ? 'expired' : 'status_' . $this->status,
                     ]);
+
+                    // If user is expired, soft delete from application
+                    if ($this->isExpired() && $this->status !== User::STATUS_DELETED) {
+                        $this->status = User::STATUS_DELETED;
+                        $this->save();
+
+                        Log::info('Expired user deleted from application', [
+                            'user_id' => $this->id,
+                            'fortigate_username' => $this->fortigate_username,
+                            'expired_at' => $this->expires_at,
+                        ]);
+                    }
                 }
-                
+
                 $this->updateFortiGateSync(User::SYNC_NOT_REQUIRED);
                 return true;
             }
