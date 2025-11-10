@@ -614,7 +614,8 @@ class FortiGateService
                     $apiResponse = $e->getApiResponse();
 
                     // 404 = Resource not found (expected when checking if user exists)
-                    if ($statusCode === 404) {
+                    // Also check error message for 404 as fallback
+                    if ($statusCode === 404 || str_contains($e->getMessage(), 'status code 404')) {
                         throw $e;
                     }
 
@@ -691,15 +692,9 @@ class FortiGateService
         ->timeout($this->config['timeout'])
         ->withOptions([
             'verify' => $this->config['verify_ssl'],
-        ])
-        ->throw(function ($response, $e) {
-            if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
-                $exception = new FortiGateConnectionException($e->getMessage());
-                $exception->setIsTimeout(str_contains($e->getMessage(), 'timeout'));
-                $exception->setIsNetworkError(true);
-                throw $exception;
-            }
-        });
+        ]);
+        // Note: We don't use ->throw() here because we need custom error handling
+        // in handleResponse() to properly handle 404s and other FortiGate-specific errors
     }
 
     /**
