@@ -45,4 +45,13 @@ return [
     'force_logout_button' => 'Cerrar Todas las Sesiones',
     'all_sessions_logged_out' => 'Todas las sesiones han sido cerradas. Ahora puedes iniciar sesión nuevamente.',
     'invalid_credentials' => 'Credenciales inválidas.',
+
+    // Password change form
+    'password' => [
+        'change' => 'Cambiar Contraseña',
+        'current' => 'Contraseña Actual',
+        'new' => 'Nueva Contraseña',
+        'confirm' => 'Confirmar Nueva Contraseña',
+        'requirements' => 'La contraseña debe contener al menos 16 caracteres, una letra mayúscula, una letra minúscula, un número y un carácter especial.',
+    ],
 ];

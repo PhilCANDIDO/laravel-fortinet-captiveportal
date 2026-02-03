@@ -45,4 +45,13 @@ return [
     'force_logout_button' => 'Logout All Sessions',
     'all_sessions_logged_out' => 'All sessions have been logged out. You can now log in again.',
     'invalid_credentials' => 'Invalid credentials.',
+
+    // Password change form
+    'password' => [
+        'change' => 'Change Password',
+        'current' => 'Current Password',
+        'new' => 'New Password',
+        'confirm' => 'Confirm New Password',
+        'requirements' => 'Password must contain at least 16 characters, one uppercase letter, one lowercase letter, one number and one special character.',
+    ],
 ];
