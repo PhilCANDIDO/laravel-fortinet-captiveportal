@@ -33,11 +33,11 @@ class ChangePassword extends Component
             $this->passwordFeedback = '';
             return;
         }
-        
+
         $passwordService = new PasswordService();
-        $strength = $passwordService->checkPasswordStrength($this->password);
-        $this->passwordStrength = $strength['score'];
-        $this->passwordFeedback = $strength['feedback'];
+        $result = $passwordService->checkPasswordStrength($this->password);
+        $this->passwordStrength = $result['strength'];
+        $this->passwordFeedback = implode('. ', $result['feedback']);
     }
 
     public function changePassword()
