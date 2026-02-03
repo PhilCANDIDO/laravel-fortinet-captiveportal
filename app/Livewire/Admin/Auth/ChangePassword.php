@@ -6,9 +6,6 @@ use App\Services\AuditService;
 use App\Services\PasswordService;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
-use Livewire\Attributes\Layout;
-
-#[Layout('layouts.guest')]
 class ChangePassword extends Component
 {
     public $current_password = '';
@@ -25,7 +22,8 @@ class ChangePassword extends Component
     public function render()
     {
         return view('livewire.admin.auth.change-password')
-            ->layout('layouts.admin');
+            ->extends('layouts.guest')
+            ->section('content');
     }
 
     public function updatedPassword()

@@ -53,17 +53,24 @@ class Login extends Component
             }
             
             $user->updateLastLogin(request()->ip());
-            
+
             session()->regenerate();
-            
+
             $auditService->logLogin($user->email, true);
-            
+
+            // Check if password change required (first login or expired)
+            if ($user->is_first_login || $user->must_change_password) {
+                session(['must_change_password' => true]);
+                return redirect()->route('admin.password.change')
+                    ->with('info', __('auth.first_login_password_change'));
+            }
+
             if ($user->google2fa_enabled) {
                 return redirect()->route('admin.mfa.verify');
             }
-            
+
             session(['mfa_verified' => true]);
-            
+
             return redirect()->intended(route('admin.dashboard'));
         }
         
