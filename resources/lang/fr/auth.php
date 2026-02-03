@@ -47,11 +47,12 @@ return [
     'invalid_credentials' => 'Identifiants invalides.',
 
     // Password change form
-    'password' => [
-        'change' => 'Changer le mot de passe',
+    'password_change' => [
+        'title' => 'Changer le mot de passe',
         'current' => 'Mot de passe actuel',
         'new' => 'Nouveau mot de passe',
         'confirm' => 'Confirmer le nouveau mot de passe',
         'requirements' => 'Le mot de passe doit contenir au moins 16 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
+        'submit' => 'Changer le mot de passe',
     ],
 ];

@@ -2,7 +2,7 @@
     <div class="max-w-md w-full space-y-8">
         <div>
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                {{ __('auth.password.change') }}
+                {{ __('auth.password_change.title') }}
             </h2>
             
             @if(session('must_change_password'))
@@ -28,7 +28,7 @@
                 <!-- Current Password -->
                 <div>
                     <label for="current_password" class="block text-sm font-medium text-gray-700">
-                        {{ __('auth.password.current') }}
+                        {{ __('auth.password_change.current') }}
                     </label>
                     <input wire:model="current_password" type="password" id="current_password" 
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -41,7 +41,7 @@
                 <!-- New Password -->
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">
-                        {{ __('auth.password.new') }}
+                        {{ __('auth.password_change.new') }}
                     </label>
                     <input wire:model.live="password" type="password" id="password" 
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -86,14 +86,14 @@
                     @enderror
                     
                     <p class="mt-2 text-xs text-gray-500">
-                        {{ __('auth.password.requirements') }}
+                        {{ __('auth.password_change.requirements') }}
                     </p>
                 </div>
 
                 <!-- Confirm Password -->
                 <div>
                     <label for="password_confirmation" class="block text-sm font-medium text-gray-700">
-                        {{ __('auth.password.confirm') }}
+                        {{ __('auth.password_change.confirm') }}
                     </label>
                     <input wire:model="password_confirmation" type="password" id="password_confirmation" 
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -106,7 +106,7 @@
                         wire:loading.attr="disabled"
                         wire:loading.class="opacity-50 cursor-not-allowed"
                         class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <span wire:loading.remove>{{ __('auth.password.change') }}</span>
+                    <span wire:loading.remove>{{ __('auth.password_change.submit') }}</span>
                     <span wire:loading>{{ __('auth.processing') }}</span>
                 </button>
             </div>

@@ -47,11 +47,12 @@ return [
     'invalid_credentials' => 'Credenziali non valide.',
 
     // Password change form
-    'password' => [
-        'change' => 'Cambia Password',
+    'password_change' => [
+        'title' => 'Cambia Password',
         'current' => 'Password Attuale',
         'new' => 'Nuova Password',
         'confirm' => 'Conferma Nuova Password',
         'requirements' => 'La password deve contenere almeno 16 caratteri, una lettera maiuscola, una lettera minuscola, un numero e un carattere speciale.',
+        'submit' => 'Cambia Password',
     ],
 ];

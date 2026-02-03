@@ -47,11 +47,12 @@ return [
     'invalid_credentials' => 'Invalid credentials.',
 
     // Password change form
-    'password' => [
-        'change' => 'Change Password',
+    'password_change' => [
+        'title' => 'Change Password',
         'current' => 'Current Password',
         'new' => 'New Password',
         'confirm' => 'Confirm New Password',
         'requirements' => 'Password must contain at least 16 characters, one uppercase letter, one lowercase letter, one number and one special character.',
+        'submit' => 'Change Password',
     ],
 ];

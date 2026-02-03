@@ -47,11 +47,12 @@ return [
     'invalid_credentials' => 'Credenciales inválidas.',
 
     // Password change form
-    'password' => [
-        'change' => 'Cambiar Contraseña',
+    'password_change' => [
+        'title' => 'Cambiar Contraseña',
         'current' => 'Contraseña Actual',
         'new' => 'Nueva Contraseña',
         'confirm' => 'Confirmar Nueva Contraseña',
         'requirements' => 'La contraseña debe contener al menos 16 caracteres, una letra mayúscula, una letra minúscula, un número y un carácter especial.',
+        'submit' => 'Cambiar Contraseña',
     ],
 ];
