@@ -289,6 +289,58 @@ php artisan cache:clear       # Clear application cache
 
 ## 🚢 Deployment
 
+### Production Deployment Script
+
+The project includes an idempotent deployment script (`deploy.sh`) for Continuous Delivery:
+
+```bash
+# Standard deployment from main branch
+./deploy.sh --branch=main
+
+# Preview deployment steps without executing
+./deploy.sh --dry-run
+
+# Force reset local changes (useful when local files were modified)
+./deploy.sh --branch=main --force-git-reset
+
+# Custom PHP-FPM service and web user
+./deploy.sh --php-fpm-service=php8.3-fpm --webuser=www-data
+
+# Skip npm build (faster deploys when frontend unchanged)
+./deploy.sh --branch=main --skip-npm
+
+# Setup daily backup cron job
+./deploy.sh --backup-cron
+```
+
+#### Deployment Script Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--branch=BRANCH` | Git branch to deploy | `main` |
+| `--php-fpm-service=NAME` | PHP-FPM service name | `php-fpm` |
+| `--webuser=USER` | Web server user | `nginx` |
+| `--force-git-reset` | Force reset to remote branch | `false` |
+| `--skip-npm` | Skip npm install and build | `false` |
+| `--backup-cron` | Setup daily backup cron at 23:00 | `false` |
+| `--dry-run` | Preview steps without executing | `false` |
+
+#### What the Script Does
+
+1. **Checks requirements** - Verifies php, composer, git, npm are available
+2. **Creates directories** - Ensures storage and cache directories exist
+3. **Sets permissions** - Applies correct ownership and permissions
+4. **Pulls code** - Fetches and pulls latest from specified branch
+5. **Installs PHP deps** - Runs `composer install --no-dev --optimize-autoloader`
+6. **Builds frontend** - Runs `npm ci && npm run build`
+7. **Runs migrations** - Executes `php artisan migrate --force`
+8. **Optimizes Laravel** - Caches config, routes, views, and events
+9. **Restarts services** - Reloads PHP-FPM, Horizon, and queue workers
+
+#### Deployment Logs
+
+All deployment actions are logged to `storage/logs/deploy-YYYY-MM-DD.log` for audit and troubleshooting.
+
 ### Docker Deployment
 
 ```bash
