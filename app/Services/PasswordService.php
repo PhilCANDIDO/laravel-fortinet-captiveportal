@@ -20,7 +20,6 @@ class PasswordService
                 ->numbers()
                 ->symbols()
                 ->uncompromised(),
-            'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{16,}$/',
         ];
     }
     
@@ -77,10 +76,10 @@ class PasswordService
             $feedback[] = 'Add numbers';
         }
         
-        if (preg_match('/[@$!%*?&]/', $password)) {
+        if (preg_match('/[^A-Za-z0-9]/', $password)) {
             $strength += 15;
         } else {
-            $feedback[] = 'Add special characters (@$!%*?&)';
+            $feedback[] = 'Add special characters';
         }
         
         if (preg_match('/(.)\1{2,}/', $password)) {
